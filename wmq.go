@@ -1,11 +1,13 @@
 package main
 
 import (
-	"time"
-
+	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/Jeffail/gabs"
 	"github.com/Sirupsen/logrus"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/rifflock/lfshook"
@@ -16,6 +18,20 @@ import (
 type mqConnection struct {
 	conn          *amqp.Connection
 	isManualClose bool
+}
+type message struct {
+	Consumers   []consumer
+	Durable     bool
+	IsNeedToken bool
+	Mode        string
+	Name        string
+	Token       string
+}
+type consumer struct {
+	ID       string
+	URL      string
+	RouteKey string
+	Timeout  float64
 }
 
 const (
@@ -29,9 +45,19 @@ var (
 	uri                        = "amqp://gome:gome@10.125.207.4:5672/"
 	mqConnectionFailRetrySleep = 5 * time.Second
 	log                        = logrus.New()
+	messages                   = []message{}
 )
 
 func init() {
+	var err error
+	var content string
+	content, err = fileGetContents("ac.json")
+	fatal("get config file fail", err)
+	messages, err = parseMessages(content)
+	fatal("parse config file fail", err)
+	for _, msg := range messages {
+		log.Println(msg.Name)
+	}
 	p, _ := filepath.Abs("./")
 	if strings.Contains(p, "/Users") {
 		uri = "amqp://guest:guest@127.0.0.1:5672/"
@@ -58,10 +84,66 @@ func init() {
 }
 func main() {
 	log.Info("service started")
+
 	//queueDeclare("test", false, true, false, false, nil, true, consumePoolName)
 
-	time.Sleep(time.Second * 1000)
+	select {}
 
+}
+func fileGetContents(file string) (content string, err error) {
+	defer func(err *error) {
+		e := recover()
+		if e != nil {
+			*err = fmt.Errorf("%s", e)
+		}
+	}(&err)
+	bytes, err := ioutil.ReadFile(file)
+	content = string(bytes)
+	return
+}
+func fatal(flag string, err interface{}) {
+	if err != nil {
+		log.Fatalf(flag+":%s", err)
+	}
+}
+func value(v interface{}, defaultValue interface{}) interface{} {
+	if v != nil {
+		return v
+	}
+	return defaultValue
+}
+func parseMessages(str string) (messages []message, err error) {
+	defer func(err *error) {
+		e := recover()
+		if e != nil {
+			*err = fmt.Errorf("%s", e)
+		}
+	}(&err)
+	json, _ := gabs.ParseJSON([]byte(str))
+	msgs, _ := json.Children()
+	for _, m := range msgs {
+		consumers := []consumer{}
+		cs, _ := m.S("consumers").Children()
+		for _, c := range cs {
+			cc := consumer{
+				ID:       c.S("id").Data().(string),
+				URL:      c.S("url").Data().(string),
+				RouteKey: c.S("routeKey").Data().(string),
+				Timeout:  c.S("timeout").Data().(float64),
+			}
+			consumers = append(consumers, cc)
+		}
+		msg := message{
+			Name:        m.S("name").Data().(string),
+			Durable:     m.S("durable").Data().(bool),
+			IsNeedToken: m.S("isNeedToken").Data().(bool),
+			Mode:        m.S("mode").Data().(string),
+			Token:       m.S("token").Data().(string),
+			Consumers:   consumers,
+		}
+		messages = append(messages, msg)
+	}
+	return
 }
 func connectToRabbitMQ(uri string) *amqp.Connection {
 	for {
@@ -163,7 +245,7 @@ func queueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args
 			channel = getMqChannel(consumePoolName)
 			_, err = channel.QueueDelete(name, false, false, false)
 			if err != nil {
-				log.Errorf("hannel.QueueDelete("+name+", false, false, false):%s", err)
+				log.Infof("hannel.QueueDelete("+name+", false, false, false):%s", err)
 				continue
 			}
 		}
@@ -182,7 +264,7 @@ func exchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bo
 			channel = getMqChannel(consumePoolName)
 			err = channel.ExchangeDelete(name, false, false)
 			if err != nil {
-				log.Errorf("hannel.ExchangeDelete("+name+", false, false, false):%s", err)
+				log.Infof("hannel.ExchangeDelete("+name+", false, false, false):%s", err)
 				continue
 			}
 		}
