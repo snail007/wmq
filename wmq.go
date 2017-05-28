@@ -1,9 +1,14 @@
 package main
 
 import (
-	"log"
 	"time"
 
+	"path/filepath"
+	"strings"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/lestrrat/go-file-rotatelogs"
+	"github.com/rifflock/lfshook"
 	"github.com/snail007/pool"
 	"github.com/streadway/amqp"
 )
@@ -20,149 +25,170 @@ const (
 )
 
 var (
-	pools = make(map[string]pool.Pool)
-	uri   = "amqp://gome:gome@10.125.207.4:5672/"
+	pools                      = make(map[string]pool.Pool)
+	uri                        = "amqp://gome:gome@10.125.207.4:5672/"
+	mqConnectionFailRetrySleep = 5 * time.Second
+	log                        = logrus.New()
 )
 
+func init() {
+	p, _ := filepath.Abs("./")
+	if strings.Contains(p, "/Users") {
+		uri = "amqp://guest:guest@127.0.0.1:5672/"
+	}
+	//log.Formatter = new(logrus.JSONFormatter)
+	log.Level = logrus.DebugLevel
+	infoWriter, _ := rotatelogs.New(
+		"log/info.%Y%m%d%H%M.log",
+		rotatelogs.WithLinkName("log/info.log"),
+		rotatelogs.WithMaxAge(time.Hour*24*7),
+		rotatelogs.WithRotationTime(time.Hour),
+	)
+	errorWriter, _ := rotatelogs.New(
+		"log/error.%Y%m%d%H%M.log",
+		rotatelogs.WithLinkName("log/error.log"),
+		rotatelogs.WithMaxAge(time.Hour*24*7),
+		rotatelogs.WithRotationTime(time.Hour),
+	)
+	log.Hooks.Add(lfshook.NewHook(lfshook.WriterMap{
+		logrus.InfoLevel:  infoWriter,
+		logrus.ErrorLevel: errorWriter,
+	}))
+
+}
+func main() {
+	log.Info("service started")
+	//queueDeclare("test", false, true, false, false, nil, true, consumePoolName)
+
+	time.Sleep(time.Second * 1000)
+
+}
 func connectToRabbitMQ(uri string) *amqp.Connection {
 	for {
 		conn, err := amqp.Dial(uri)
-
 		if err == nil {
 			return conn
 		}
-
-		log.Println(err)
-		log.Printf("Trying to reconnect to RabbitMQ at %s\n", uri)
-		time.Sleep(500 * time.Millisecond)
+		log.Errorf("Trying to reconnect to RabbitMQ at %s\n", uri)
+		time.Sleep(mqConnectionFailRetrySleep)
 	}
 }
-func getConnection(poolName string) (mqConnection, pool.Pool, error) {
-	if _, ok := pools[poolName]; ok {
-		c, e := pools[poolName].Get()
-		failOnError(e, "fail pools[poolName].Get() in ok")
-		var conn = c.(mqConnection)
-		return conn, pools[poolName], e
-	}
-	factory := func() (interface{}, error) {
-		c := connectToRabbitMQ(uri)
-		errchn := make(chan *amqp.Error)
-		c.NotifyClose(errchn)
-		mqConn := mqConnection{
-			conn:          c,
-			isManualClose: false,
-		}
-		go func(c mqConnection) {
-			var rabbitErr *amqp.Error
-			for {
-				rabbitErr = <-errchn
-				if mqConn.isManualClose {
-					break
-				}
-				if rabbitErr != nil {
-					log.Printf("Connecting to %s\n", uri)
-					mqConn.conn = connectToRabbitMQ(uri)
-					errchn = make(chan *amqp.Error)
-					mqConn.conn.NotifyClose(errchn)
-				}
-			}
-		}(mqConn)
-		return mqConn, nil
-	}
-	close := func(v interface{}) error {
-		mqConnection := v.(mqConnection)
-		mqConnection.isManualClose = true
-		return mqConnection.conn.Close()
-	}
-	poolConfig := &pool.PoolConfig{
-		InitialCap:  5,
-		MaxCap:      30,
-		Factory:     factory,
-		AutoClose:   false,
-		Close:       close,
-		IdleTimeout: 15 * time.Second,
-	}
-	p, e := pool.NewChannelPool(poolConfig)
-	failOnError(e, "fail pool.NewChannelPool")
-	pools[poolName] = p
-	c, e := pools[poolName].Get()
-	failOnError(e, "fail pools[poolName].Get()")
-	return c.(mqConnection), pools[poolName], e
-}
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
-	}
-}
-func main() {
-	// var conn, err = amqp.Dial("amqp://gome:gome@10.125.207.4:5672/")
-	// failOnError(err, "Failed to connect to RabbitMQ")
-	// defer conn.Close()
-	queueDeclare("test", false, true, false, false, nil)
-	queueDeclare("test", true, false, false, false, nil)
-	queueDeclare("test", true, false, false, false, nil)
-	queueDeclare("test", true, false, false, false, nil)
-	queueDeclare("test", true, false, false, false, nil)
-	queueDeclare("test", true, false, false, false, nil)
-	time.Sleep(time.Second * 1000)
-	// err3 := ch.ExchangeDeclare("hello", "fanout", false, true, false, false, nil)
-	// failOnError(err3, "Failed err3")
-	// ch.Close()
-	// ch, err1 = conn.Channel()
-	// failOnError(err1, "Failed to open a channel")
-	// ch.QueueBind("hello", "", "hello", false, nil)
-	// ch.QueueDeclare()
-	// var _, er = ch.QueueDeclare(
-	// 	"hello", // name
-	// 	false,   // durable
-	// 	true,    // delete when unused
-	// 	false,   // exclusive
-	// 	false,   // no-wait
-	// 	nil,     // arguments
-	// )
-	// failOnError(er, "Failed to declare a queue")
-	// ch.Close()
-	// ch, err1 = conn.Channel()
-	// failOnError(err1, "Failed to open a channel")
-	// var _, er3 = ch.Consume("hello", "", true, false, true, false, nil)
-	// failOnError(er3, "Failed to er3")
-	// time.Sleep(time.Second * 1000)
-}
-
-func queueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) amqp.Queue {
-	var queue amqp.Queue
-	var err error
-	var mqConn mqConnection
-	var channel *amqp.Channel
-	var poolConsme pool.Pool
+func getMqConnection(poolName string) (mqConnection, pool.Pool, error) {
 	for {
-		mqConn, poolConsme, err = getConnection(consumePoolName)
-		poolConsme.Put(mqConn)
-		failOnError(err, "getConnection("+consumePoolName+")")
-		if err != nil {
+		if _, ok := pools[poolName]; ok {
+			c, e := pools[poolName].Get()
+			if e != nil {
+				log.Errorf("pools[poolName].Get() fail in exists pool:%s", e)
+				continue
+			}
+			var conn = c.(mqConnection)
+			return conn, pools[poolName], e
+		}
+		factory := func() (interface{}, error) {
+			c := connectToRabbitMQ(uri)
+			errchn := make(chan *amqp.Error)
+			c.NotifyClose(errchn)
+			mqConn := mqConnection{
+				conn:          c,
+				isManualClose: false,
+			}
+			go func(c mqConnection) {
+				var rabbitErr *amqp.Error
+				for {
+					rabbitErr = <-errchn
+					if mqConn.isManualClose {
+						break
+					}
+					if rabbitErr != nil {
+						log.Errorf("Connecting to %s:%s", uri, rabbitErr)
+						mqConn.conn = connectToRabbitMQ(uri)
+						errchn = make(chan *amqp.Error)
+						mqConn.conn.NotifyClose(errchn)
+					}
+				}
+			}(mqConn)
+			return mqConn, nil
+		}
+
+		close := func(v interface{}) error {
+			mqConnection := v.(mqConnection)
+			mqConnection.isManualClose = true
+			return mqConnection.conn.Close()
+		}
+		poolConfig := &pool.PoolConfig{
+			InitialCap:  5,
+			MaxCap:      30,
+			Factory:     factory,
+			AutoClose:   false,
+			Close:       close,
+			IdleTimeout: 15 * time.Second,
+		}
+		p, e := pool.NewChannelPool(poolConfig)
+		if e != nil {
+			log.Errorf("fail pool.NewChannelPool(poolConfig):%s", e)
 			continue
 		}
-		channel, err = mqConn.conn.Channel()
-		defer channel.Close()
-		failOnError(err, "mqConn.conn.Channel()")
-		queue, err = channel.QueueDeclarePassive(name, durable, autoDelete, exclusive, noWait, args)
-		failOnError(err, "channel.QueueDeclarePassive")
-		mqConn, poolConsme, err := getConnection(consumePoolName)
-		poolConsme.Put(mqConn)
-		failOnError(err, "getConnection("+consumePoolName+") [for delete]")
-		channel1, err1 := mqConn.conn.Channel()
-		failOnError(err1, "mqConn.conn.Channel() [for delete]")
-		defer channel1.Close()
-		channel1.QueueDelete(name, false, false, false)
-
-		mqConn, poolConsme, err = getConnection(consumePoolName)
-		poolConsme.Put(mqConn)
-		failOnError(err, "getConnection("+consumePoolName+") [for return]")
-		queue, err = channel.QueueDeclare(name, durable, autoDelete, exclusive, noWait, args)
-		failOnError(err, "channel.QueueDeclare("+consumePoolName+") [for return]")
-		if err == nil {
-			return queue
+		pools[poolName] = p
+		c, e := pools[poolName].Get()
+		if e != nil {
+			log.Errorf("fail pools[poolName].Get():%s", e)
+			continue
 		}
+		return c.(mqConnection), pools[poolName], e
 	}
+}
+func getMqChannel(poolName string) *amqp.Channel {
+	for {
+		mqConn, poolConsme, err := getMqConnection(poolName)
+		poolConsme.Put(mqConn)
+		if err != nil {
+			log.Errorf("getConnection("+poolName+"):%s", err)
+			continue
+		}
+		channel, err := mqConn.conn.Channel()
+		if err != nil {
+			log.Errorf("mqConn.conn.Channel():%s", err)
+			continue
+		}
+		return channel
+	}
+}
 
+func queueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table, autoClose bool, poolName string) (queue amqp.Queue, channel *amqp.Channel) {
+	var err error
+	for {
+		channel = getMqChannel(consumePoolName)
+		queue, err = channel.QueueDeclare(name, durable, autoDelete, exclusive, noWait, args)
+		if err != nil {
+			channel = getMqChannel(consumePoolName)
+			_, err = channel.QueueDelete(name, false, false, false)
+			if err != nil {
+				log.Errorf("hannel.QueueDelete("+name+", false, false, false):%s", err)
+				continue
+			}
+		}
+		if autoClose {
+			channel.Close()
+		}
+		return
+	}
+}
+func exchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table, autoClose bool, poolName string) (channel *amqp.Channel) {
+	var err error
+	for {
+		channel = getMqChannel(consumePoolName)
+		err = channel.ExchangeDeclare(name, kind, durable, autoDelete, internal, noWait, args)
+		if err != nil {
+			channel = getMqChannel(consumePoolName)
+			err = channel.ExchangeDelete(name, false, false)
+			if err != nil {
+				log.Errorf("hannel.ExchangeDelete("+name+", false, false, false):%s", err)
+				continue
+			}
+		}
+		if autoClose {
+			channel.Close()
+		}
+		return
+	}
 }
