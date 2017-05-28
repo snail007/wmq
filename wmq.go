@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -49,21 +50,25 @@ var (
 )
 
 func init() {
+	//log.Formatter = new(logrus.JSONFormatter)
+	log.Level = logrus.DebugLevel
 	var err error
 	var content string
-	content, err = fileGetContents("ac.json")
+	content, err = fileGetContents("a.json")
 	fatal("get config file fail", err)
 	messages, err = parseMessages(content)
 	fatal("parse config file fail", err)
+	b, _ := json.Marshal(messages)
+	c, _ := gabs.ParseJSON(b)
+	log.Info(c.StringIndent("", "	"))
 	for _, msg := range messages {
-		log.Println(msg.Name)
+		log.Println(msg.Name + "bbb")
 	}
 	p, _ := filepath.Abs("./")
 	if strings.Contains(p, "/Users") {
 		uri = "amqp://guest:guest@127.0.0.1:5672/"
 	}
-	//log.Formatter = new(logrus.JSONFormatter)
-	log.Level = logrus.DebugLevel
+
 	infoWriter, _ := rotatelogs.New(
 		"log/info.%Y%m%d%H%M.log",
 		rotatelogs.WithLinkName("log/info.log"),
@@ -123,22 +128,22 @@ func parseMessages(str string) (messages []message, err error) {
 	msgs, _ := json.Children()
 	for _, m := range msgs {
 		consumers := []consumer{}
-		cs, _ := m.S("consumers").Children()
+		cs, _ := m.S("Consumers").Children()
 		for _, c := range cs {
 			cc := consumer{
-				ID:       c.S("id").Data().(string),
-				URL:      c.S("url").Data().(string),
-				RouteKey: c.S("routeKey").Data().(string),
-				Timeout:  c.S("timeout").Data().(float64),
+				ID:       c.S("ID").Data().(string),
+				URL:      c.S("URL").Data().(string),
+				RouteKey: c.S("RouteKey").Data().(string),
+				Timeout:  c.S("Timeout").Data().(float64),
 			}
 			consumers = append(consumers, cc)
 		}
 		msg := message{
-			Name:        m.S("name").Data().(string),
-			Durable:     m.S("durable").Data().(bool),
-			IsNeedToken: m.S("isNeedToken").Data().(bool),
-			Mode:        m.S("mode").Data().(string),
-			Token:       m.S("token").Data().(string),
+			Name:        m.S("Name").Data().(string),
+			Durable:     m.S("Durable").Data().(bool),
+			IsNeedToken: m.S("IsNeedToken").Data().(bool),
+			Mode:        m.S("Mode").Data().(string),
+			Token:       m.S("Token").Data().(string),
 			Consumers:   consumers,
 		}
 		messages = append(messages, msg)

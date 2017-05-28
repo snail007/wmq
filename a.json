@@ -1,17 +1,17 @@
 [
     {
-    "consumers": [
+    "Consumers": [
       {
-        "id":"234",
-        "url": "http://gitcode.com/test/gzip.php",
-        "timeout": 5000,
-	      "routeKey": "test"
+        "ID":"234",
+        "URL": "http://gitcode.com/test/gzip.php",
+        "Timeout": 5000,
+	      "RouteKey": "test"
       }
     ],
-    "durable": true,
-    "isNeedToken": true,
-    "mode": "direct",
-    "name": "test2",
-    "token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
+    "Durable": true,
+    "IsNeedToken": true,
+    "Mode": "direct",
+    "Name": "test2",
+    "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
   }
 ]
