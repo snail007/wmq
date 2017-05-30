@@ -25,9 +25,13 @@ func initLog() {
 		rotatelogs.WithMaxAge(time.Hour*24*7),
 		rotatelogs.WithRotationTime(time.Hour),
 	)
+
 	log.Hooks.Add(lfshook.NewHook(lfshook.WriterMap{
 		logrus.InfoLevel:  infoWriter,
 		logrus.ErrorLevel: errorWriter,
 	}))
-	logrus.AddHook(logrus_stack.StandardHook())
+
+	callerLevels := logrus.AllLevels
+	stackLevels := []logrus.Level{logrus.PanicLevel, logrus.FatalLevel, logrus.ErrorLevel}
+	logrus.AddHook(logrus_stack.NewHook(callerLevels, stackLevels))
 }

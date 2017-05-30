@@ -12,17 +12,15 @@ import (
 const (
 	poolInitialCap        = 5
 	poolMaxCap            = 300
-	poolChannelInitialCap = 100
+	poolChannelInitialCap = 10
 	poolChannelMaxCap     = 1000
-	consumePoolName       = "consume"
-	publishPoolName       = "publish"
 )
 
 var (
 	uri                            = "amqp://gome:gome@10.125.207.4:5672/"
 	mqHeartbeat                    = time.Second * 2
-	mqConnectionAndDeadlineTimeout = time.Second * 6
-	mqConnectionFailRetrySleep     = time.Second * 5
+	mqConnectionAndDeadlineTimeout = time.Second * 4
+	mqConnectionFailRetrySleep     = time.Second * 3
 
 	log      = logrus.New()
 	messages = []message{}
@@ -31,33 +29,51 @@ var (
 func main() {
 
 	//log.Info("service started")
-	//exchangeDeclare("test", "fanout", true, true, false, false, nil, true, "publish", 1)
-	//exchangeDeclare("test", "fanout", false, true, "publish", 1)
-	//queueDeclare("test", false, true, consumePoolName, 1)
-	//queueBindToExchange("test", "test", "")
-	err := publish("hello haha", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J", 2)
-	if err != nil {
-		log.Error(err)
-	} else {
-		log.Info("send SUCCESS")
-	}
+	// for i := 0; i < 10; i++ {
+	exchangeDeclare("test", "fanout", true)
+	exchangeDeclare("test", "fanout", false)
+	// }
+	queueDeclare("test", true)
+	queueDeclare("test", false)
+	queueBindToExchange("test", "test", "")
+	// err := publish("hello haha", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J", 2)
+	// if err != nil {
+	// 	log.Error(err)
+	// } else {
+	// 	log.Info("send SUCCESS")
+	// }
+
 	go func() {
-		time.Sleep(time.Second * 10)
-		addConsumer("test", consumer{
-			ID:       "333",
-			URL:      "URL",
-			Timeout:  5200,
-			RouteKey: "#",
-		})
-		time.Sleep(time.Second * 3)
-		deleteConsumer(messages[0], messages[0].Consumers[2])
-		publish("hello world", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J", 2)
+		// for {
+		// 	time.Sleep(time.Second * 2)
+		// 	log.Infof("pool len : %d , channel pool len : %d", pools.Len(), channelPools.Len())
+		// }
+	}()
+	go func() {
+		//time.Sleep(time.Second * 10)
+		// saveConsumer("test", consumer{
+		// 	ID:       "333",
+		// 	URL:      "URL",
+		// 	Timeout:  5200,
+		// 	RouteKey: "#",
+		// })
+		//time.Sleep(time.Second * 3)
+		//deleteConsumer(messages[0], messages[0].Consumers[2])
+		// saveConsumer("test", consumer{
+		// 	ID:       "333",
+		// 	URL:      "URL",
+		// 	Timeout:  5200,
+		// 	RouteKey: "test",
+		// })
+		//log.Debug("waiting...")
+		//time.Sleep(time.Second * 3)
+		//publish("hello world", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J")
 	}()
 	select {}
 }
 
 func init() {
-
+	var err error
 	//begin init logger
 	initLog()
 	//end init logger
@@ -71,7 +87,15 @@ func init() {
 	fatal("get config file fail", err)
 	messages, err = parseMessages(content)
 	fatal("parse config file fail", err)
-	initMessages()
+
+	if err = initPool(); err != nil {
+		log.Fatalf("init connection to rabbitmq fail : %s", err)
+
+	}
+	if err = initChannelPool(); err != nil {
+		log.Fatalf("init Channel Pool fail : %s", err)
+	}
+
 	//end init var
 
 	// b, _ := json.Marshal(messages)
