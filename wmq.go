@@ -104,6 +104,8 @@ func main() {
 	queueDeclare("test", true, false, false, false, nil)
 	queueDeclare("test", true, false, false, false, nil)
 	queueDeclare("test", true, false, false, false, nil)
+	queueDeclare("test", true, false, false, false, nil)
+	queueDeclare("test", true, false, false, false, nil)
 	time.Sleep(time.Second * 1000)
 	// err3 := ch.ExchangeDeclare("hello", "fanout", false, true, false, false, nil)
 	// failOnError(err3, "Failed err3")
@@ -154,7 +156,6 @@ func queueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args
 		failOnError(err1, "mqConn.conn.Channel() [for delete]")
 		defer channel1.Close()
 		channel1.QueueDelete(name, false, false, false)
-
 		mqConn, poolConsme, err = getConnection(consumePoolName)
 		poolConsme.Put(mqConn)
 		failOnError(err, "getConnection("+consumePoolName+") [for return]")
