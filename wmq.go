@@ -104,7 +104,14 @@ func main() {
 			Mode:        "topic",
 			Token:       "fadafasdfs",
 		})
-
+		time.Sleep(time.Second * 5)
+		deleteMessage(message{
+			Name:        "vaddtest",
+			Durable:     false,
+			IsNeedToken: true,
+			Mode:        "topic",
+			Token:       "fadafasdfs",
+		})
 		// time.Sleep(time.Second * 30)
 		// messages[0].Consumers[1].URL = "333 URL"
 		//deleteConsumer(messages[0], messages[0].Consumers[1])

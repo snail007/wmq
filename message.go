@@ -146,6 +146,33 @@ func updateMessage(m message) (err error) {
 	initMessages()
 	return
 }
+func deleteMessage(m message) (err error) {
+	msg, i, e := getMessage(m.Name)
+	if e != nil {
+		err = e
+		return
+	}
+	//stop all consumer worker
+	for _, c := range msg.Consumers {
+		_, e := stopConsumerWorker(c, m)
+		if e != nil {
+			err = e
+			log.Infof("message [ %s ] was delete fail [stopConsumerWorker] , %s", m.Name, e)
+			return
+		}
+		er := deleteQueue(getConsumerKey(*msg, c))
+		if er != nil {
+			err = er
+			log.Infof("message [ %s ] was delete fail [deleteQueue] , %s", m.Name, e)
+			return
+		}
+	}
+	//update messsages data
+	messages = append(messages[:i], messages[i+1:]...)
+	log.Infof("message [ %s ] was deleted", m.Name)
+	initMessages()
+	return
+}
 func addConsumer(msg message, c0 consumer) (err error) {
 	//add it to messages
 	var i int
