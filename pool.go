@@ -5,6 +5,13 @@ import (
 	"sync"
 )
 
+//ConnPool to use
+type ConnPool interface {
+	Get() (conn interface{}, err error)
+	Put(conn interface{})
+	ReleaseAll()
+	Len() (length int)
+}
 type poolConfig struct {
 	Factory    func() (interface{}, error)
 	IsActive   func(interface{}) bool
@@ -13,22 +20,22 @@ type poolConfig struct {
 	MaxCap     int
 }
 
-func newNetPool(poolConfig poolConfig) (pool netPool, err error) {
-	pool = netPool{
+func newNetPool(poolConfig poolConfig) (pool ConnPool, err error) {
+	p := netPool{
 		config: poolConfig,
 		conns:  make(chan interface{}, poolConfig.MaxCap),
 		lock:   &sync.Mutex{},
 	}
 	for i := 0; i < poolConfig.InitialCap; i++ {
-		c, err := pool.config.Factory()
+		c, err := poolConfig.Factory()
 		if err != nil {
 			err = fmt.Errorf("factory is not able to fill the pool: %s", err)
 			pool.ReleaseAll()
 			break
 		}
-		pool.conns <- c
+		p.conns <- c
 	}
-	return
+	return &p, nil
 }
 
 type netPool struct {

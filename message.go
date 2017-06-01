@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"sync"
-
 	"time"
+
+	"runtime"
 
 	"github.com/Jeffail/gabs"
 	"github.com/streadway/amqp"
@@ -27,13 +27,6 @@ type consumer struct {
 	RouteKey string
 	Timeout  float64
 }
-
-var (
-	messageStartLocks = make(map[string]*sync.Mutex)
-	getLocker         = new(sync.Mutex)
-	//startMessageSignals = make(chan message, 1)
-	consumerSignals = make(map[string]chan string)
-)
 
 // func initMessages() {
 // 	for _, msg := range messages {
@@ -98,66 +91,104 @@ func consumerIsExists(exchangeName, consumerName string) (exists bool, exchangeI
 	}
 	return false, 0, 0
 }
-func getMessage(name string) (msg *message, err error) {
-	for _, m := range messages {
+func getMessage(name string) (msg *message, key int, err error) {
+	for k, m := range messages {
 		if m.Name == name {
 			msg = &m
+			key = k
 			return
 		}
 	}
-	return nil, errors.New("message not found")
+	err = errors.New("message not found")
+	return
 }
-
-/**
-删除一个消费者,需要进行下面的清理工作
-1、停止消费协程
-2、删除consumerSignals中的控制信号
-3、删除messages里面的消费者
-4、删除消费者对应的queue
-**/
-func deleteConsumer(msg message, c0 consumer) (err error) {
-	//1、停止消费协程
-	stopConsumer(msg, c0)
-	time.Sleep(time.Millisecond * 100)
-	//2、删除consumerSignals中的控制信号
-	delete(consumerSignals, getQueueName(msg, c0))
-	//3、删除messages里面的消费者
-STOP:
-	for k1, m := range messages {
-		if m.Name == msg.Name {
-			for k2, c := range m.Consumers {
-				if c.ID == c0.ID {
-					messages[k1].Consumers = append(messages[k1].Consumers[0:k2], messages[k1].Consumers[k2+1:]...)
-					log.Debugf("consumer [ %s ] was deleted from messages", getQueueName(msg, c))
-					//4、删除消费者对应的queue
-					err = deleteQueue(getQueueName(m, c))
-					break STOP
-				}
-			}
+func getConsumer(msgMame, consumerID string) (consumer *consumer, msgIndex, consumerIndex int, err error) {
+	_, i, e := getMessage(msgMame)
+	if e != nil {
+		err = e
+		return
+	}
+	msgIndex = i
+	for k, c := range messages[i].Consumers {
+		if c.ID == consumerID {
+			consumer = &c
+			consumerIndex = k
+			return
 		}
 	}
-
-	log.Infof("consumer [ %s ] was deleted.", getQueueName(msg, c0))
+	err = errors.New("consumer not found")
 	return
 }
 
-func stopConsumer(msg message, c consumer) {
-	queueName := getQueueName(msg, c)
-	if singal, ok := consumerSignals[queueName]; ok {
-		select {
-		case singal <- "exit":
-		default:
+func addMessage(m message) (err error) {
+	messages = append(messages, m)
+	log.Infof("message [ %s ] was added", m.Name)
+	initMessages()
+	return nil
+}
+func updateMessage(m message) (err error) {
+	_, i, e := getMessage(m.Name)
+	if e != nil {
+		err = e
+		return
+	}
+	m.Consumers = messages[i].Consumers
+	messages[i] = m
+	for _, c := range m.Consumers {
+		_, e := stopConsumerWorker(c, m)
+		if e != nil {
+			err = e
+			log.Infof("message [ %s ] was updated fail , %s", m.Name, e)
+			return
 		}
 	}
-
+	log.Infof("message [ %s ] was updated", m.Name)
+	initMessages()
+	return
+}
+func addConsumer(msg message, c0 consumer) (err error) {
+	//add it to messages
+	var i int
+	_, i, err = getMessage(msg.Name)
+	if err != nil {
+		return
+	}
+	//update messages data
+	messages[i].Consumers = append(messages[i].Consumers, c0)
+	//update worker
+	initMessages()
+	log.Infof("consumer [ %s ] was added", getConsumerKey(msg, c0))
+	return
 }
 
-func getQueueName(msg message, c consumer) string {
-	return msg.Name + "-" + c.ID
+func updateConsumer(msg message, c0 consumer) (err error) {
+	_, i, k, e := getConsumer(msg.Name, c0.ID)
+	if e != nil {
+		return e
+	}
+	//update messages data
+	messages[i].Consumers[k] = c0
+
+	//update consumer worker
+	_, err = updateConsumerWorker(c0, msg)
+	return
 }
+
+func deleteConsumer(msg message, c0 consumer) (err error) {
+	_, i0, i, _ := getConsumer(msg.Name, c0.ID)
+	//delete messages consumer
+	messages[i0].Consumers = append(messages[i0].Consumers[:i], messages[i0].Consumers[i+1:]...)
+	//stop consumer
+	_, err = stopConsumerWorker(c0, msg)
+	//update messages worker
+	initMessages()
+	log.Infof("consumer [ %s ] was deleted", getConsumerKey(msg, c0))
+	return
+}
+
 func publish(body, exchangeName, routeKey, token string) (err error) {
 	var msg *message
-	msg, err = getMessage(exchangeName)
+	msg, _, err = getMessage(exchangeName)
 	if err != nil {
 		return
 	}
@@ -183,23 +214,178 @@ func publish(body, exchangeName, routeKey, token string) (err error) {
 	return
 }
 
-func messagesMointor() {
-	// controlChns:=
-	go func() {
-		for {
-			for _, m := range messages {
-				_, err := exchangeDeclare(m.Name, m.Mode, m.Durable)
-				if err == nil {
-					for _, c := range m.Consumers {
-						_, _, err := queueDeclare(getQueueName(m, c), m.Durable)
-						if err == nil {
-							queueBindToExchange(getQueueName(m, c), m.Name, c.RouteKey)
-						}
-					}
-				}
+//WrapedConsumer xx
+type wrapedConsumer struct {
+	consumer  consumer
+	message   message
+	action    string
+	lasttime  int64
+	readChan  <-chan string
+	writeChan chan<- string
+}
 
+type manageConsumer struct {
+	wrapedConsumer
+	consumerReadChan  chan string
+	consumerWriteChan chan string
+	key               string
+}
+
+var consumerManageReadChan, consumerManageWriteChan = make(chan wrapedConsumer, 1), make(chan string, 1)
+
+func updateConsumerWorker(c consumer, m message) (answer string, err error) {
+	return notifyConsumerManager("update", c, m)
+}
+func stopConsumerWorker(c consumer, m message) (answer string, err error) {
+	return notifyConsumerManager("delete", c, m)
+}
+func statusConsumerWorker(c consumer, m message) (answer string, err error) {
+	return notifyConsumerManager("status", c, m)
+}
+func notifyConsumerManager(action string, c consumer, m message) (answer string, err error) {
+	if action != "update" && action != "delete" && action != "status" {
+		err = fmt.Errorf("action must be [update|delete]")
+		return
+	}
+	log.Debugf("sending %s to %s , waiting answer ...", action, m.Name+"_"+c.ID)
+	consumerManageReadChan <- wrapedConsumer{
+		action:   action,
+		consumer: c,
+		message:  m,
+	}
+	log.Debugf("send %s to %s okay , response to manage ...", action, m.Name+"_"+c.ID)
+	answer = <-consumerManageWriteChan
+	log.Debugf("manage answer : %s", answer)
+	return
+}
+func getConsumerKey(m message, c consumer) string {
+	return m.Name + c.ID
+}
+
+func initMessages() {
+	for _, m := range messages {
+		_, err := exchangeDeclare(m.Name, m.Mode, m.Durable)
+		if err == nil {
+			for _, c := range m.Consumers {
+				_, _, err := queueDeclare(getConsumerKey(m, c), m.Durable)
+				if err == nil {
+					err := queueBindToExchange(getConsumerKey(m, c), m.Name, c.RouteKey)
+					if err == nil {
+						answer, err := updateConsumerWorker(c, m)
+						if err == nil {
+							log.Debugf("updateConsumer answer %s ", answer)
+						} else {
+							log.Warnf("updateConsumer %s ", err)
+						}
+					} else {
+						log.Warnf("queueBindToExchange %s ", err)
+					}
+				} else {
+					log.Warnf("queueDeclare %s ", err)
+				}
 			}
-			time.Sleep(time.Second * 5)
+		} else {
+			log.Warnf("exchangeDeclare %s ", err)
+		}
+	}
+}
+func initConsumerManager() {
+	wrapedConsumers := make(map[string]*manageConsumer)
+	go func() {
+		log.Debugf("Consumer Manager started")
+		for {
+			wrapedConsumer := <-consumerManageReadChan
+			log.Debugf("revecived consumer[%s]", wrapedConsumer.action)
+			c := &manageConsumer{
+				wrapedConsumer:    wrapedConsumer,
+				consumerReadChan:  make(chan string, 1),
+				consumerWriteChan: make(chan string, 1),
+				key:               getConsumerKey(wrapedConsumer.message, wrapedConsumer.consumer),
+			}
+			switch wrapedConsumer.action {
+			case "update":
+				t := "update"
+				if _, ok := wrapedConsumers[c.key]; !ok {
+					t = "insert"
+				} else {
+					c.lasttime = wrapedConsumers[c.key].lasttime
+				}
+				log.Debugf("%s consumer[%s]", t, c.key)
+				wrapedConsumers[c.key] = c
+				if t == "insert" {
+					//start consumer go
+					go func() {
+						defer func() {
+							delete(wrapedConsumers, c.key)
+							log.Warnf("consumer[%s] goroutine exited", c.key)
+						}()
+						for {
+							if _, ok := wrapedConsumers[c.key]; !ok {
+								log.Warn("consumer[ %s ] not found , now exit", c.key)
+								runtime.Goexit()
+							}
+							//update consumer active time
+							wrapedConsumers[c.key].lasttime = time.Now().Unix()
+							channel, err := channelPools.Get()
+							if err != nil {
+								channelPools.Put(channel)
+								log.Warn("get channel fail for consumer , sleep 3 seconds ... %s", err)
+								time.Sleep(time.Second * 3)
+								continue
+							}
+							deliveryChn, err := channel.(*amqp.Channel).Consume(c.key, "", false, false, false, false, nil)
+							if err != nil {
+								channelPools.Put(channel)
+								log.Warn("get deliveryChn fail for consumer , sleep 3 seconds ...%s", err)
+								time.Sleep(time.Second * 3)
+								continue
+							}
+							for {
+								if _, ok := wrapedConsumers[c.key]; !ok {
+									log.Warn("consumer[ %s ] not found , now exit", c.key)
+									runtime.Goexit()
+								}
+								//update consumer active time
+								wrapedConsumers[c.key].lasttime = time.Now().Unix()
+								select {
+								case cmd := <-wrapedConsumers[c.key].consumerReadChan:
+									if cmd == "exit" {
+										channel.(*amqp.Channel).Close()
+										channelPools.Put(channel)
+										wrapedConsumers[c.key].consumerWriteChan <- "exit_ok"
+										runtime.Goexit()
+									}
+								case delivery, ok := <-deliveryChn:
+									if !ok {
+										channelPools.Put(channel)
+										log.Warn("get delivery fail for consumer")
+										break
+									}
+									log.Debugf("delivery revecived [ %s ] : %s", c.key, string(delivery.Body))
+								}
+							}
+						}
+					}()
+				}
+				consumerManageWriteChan <- "completed"
+			case "delete":
+				//stop consumer
+				if _, ok := wrapedConsumers[c.key]; ok {
+					log.Debugf("sending stop singal to consumer[%s] goroutine ...", c.key)
+					wrapedConsumers[c.key].consumerReadChan <- "exit"
+					log.Debugf("send  stop singal to consumer[%s] goroutine success", c.key)
+				}
+				consumerManageWriteChan <- "completed"
+			case "status":
+				v, ok := wrapedConsumers[c.key]
+				var t int64
+				if ok {
+					t = v.lasttime
+				}
+				consumerManageWriteChan <- fmt.Sprintf("%d", t)
+			default:
+				consumerManageWriteChan <- "unkown command"
+			}
 		}
 	}()
 }

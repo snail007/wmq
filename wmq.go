@@ -28,14 +28,14 @@ var (
 
 func main() {
 
-	//log.Info("service started")
+	log.Info("service started")
 	// for i := 0; i < 10; i++ {
-	exchangeDeclare("test", "fanout", true)
-	exchangeDeclare("test", "fanout", false)
+	// exchangeDeclare("test", "fanout", true)
+	// exchangeDeclare("test", "fanout", false)
 	// }
-	queueDeclare("test", true)
-	queueDeclare("test", false)
-	queueBindToExchange("test", "test", "")
+	// queueDeclare("test111", true)
+	// queueDeclare("test111", false)
+	// queueBindToExchange("test111", "test", "")
 	// err := publish("hello haha", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J", 2)
 	// if err != nil {
 	// 	log.Error(err)
@@ -43,9 +43,72 @@ func main() {
 	// 	log.Info("send SUCCESS")
 	// }
 
+	initConsumerManager()
+
+	initMessages()
+
 	go func() {
 		// for {
-		// 	time.Sleep(time.Second * 2)
+		// time.Sleep(time.Second * 5)
+		// messages[0].Consumers[0].URL = "init url"
+		// updateConsumer(messages[0].Consumers[0], messages[0])
+		// time.Sleep(time.Second * 5)
+		// messages[0].Consumers[0].URL = "updated url"
+		// updateConsumer(messages[0].Consumers[0], messages[0])
+		go func() {
+			// for {
+			// 	status, err := statusConsumerWorker(messages[0].Consumers[0], messages[0])
+			// 	if err == nil {
+			// 		i, _ := strconv.ParseInt(status, 10, 64)
+			// 		log.Infof("%d,%s", i, time.Unix(i, 0).Format("2006-01-02 15:04:05"))
+			// 	}
+			// 	time.Sleep(time.Second * 4)
+			// }
+		}()
+		//   "Durable": false,
+		//     "IsNeedToken": true,
+		//     "Mode": "topic",
+		//     "Name": "test",
+		//     "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
+		time.Sleep(time.Second * 5)
+		addMessage(message{
+			Name:        "vaddtest",
+			Durable:     false,
+			IsNeedToken: true,
+			Mode:        "fanout",
+			Token:       "fadafasdfs",
+		})
+		// status, _ := statusConsumer(messages[0].Consumers[0], messages[0])
+		// i, _ := strconv.ParseInt(status, 10, 64)
+		// log.Infof("%d,%s", i, time.Unix(i, 0).Format("2006-01-02 15:04:05"))
+
+		// time.Sleep(time.Second * 30)
+		// deleteConsumer(messages[0], messages[0].Consumers[0])
+		time.Sleep(time.Second * 5)
+		addConsumer(messages[1], consumer{
+			ID:       "1212121",
+			RouteKey: "",
+		})
+		// publish("hello world", "addtest", "", "fadafasdfs")
+
+		time.Sleep(time.Second * 5)
+		err := publish("hello world 00000000000", "vaddtest", "", "fadafasdfs")
+		if err != nil {
+			log.Errorf("%s", err)
+		}
+		time.Sleep(time.Second * 5)
+		updateMessage(message{
+			Name:        "vaddtest",
+			Durable:     false,
+			IsNeedToken: true,
+			Mode:        "topic",
+			Token:       "fadafasdfs",
+		})
+
+		// time.Sleep(time.Second * 30)
+		// messages[0].Consumers[1].URL = "333 URL"
+		//deleteConsumer(messages[0], messages[0].Consumers[1])
+		// updateConsumer(messages[0], messages[0].Consumers[1])
 		// 	log.Infof("pool len : %d , channel pool len : %d", pools.Len(), channelPools.Len())
 		// }
 	}()
@@ -66,8 +129,13 @@ func main() {
 		// 	RouteKey: "test",
 		// })
 		//log.Debug("waiting...")
-		//time.Sleep(time.Second * 3)
-		//publish("hello world", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J")
+		// for {
+		// 	time.Sleep(time.Second * 3)
+		// 	err := publish("hello world", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J")
+		// 	if err != nil {
+		// 		log.Errorf("publish %s ", err)
+		// 	}
+		// }
 	}()
 	select {}
 }

@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	pools, channelPools netPool
+	pools, channelPools ConnPool
 )
 
 type mqconn struct {
@@ -41,7 +41,6 @@ func getMqChannel() (channel *amqp.Channel, err error) {
 }
 
 func queueDeclare(name string, durable bool) (queue amqp.Queue, channel *amqp.Channel, err error) {
-	defer func() { channelPools.Put(channel) }()
 	autoDelete, exclusive, noWait := true, false, false
 	if durable {
 		autoDelete = false
@@ -55,14 +54,15 @@ RETRY:
 	channel, err = getMqChannel()
 	if err == nil {
 		queue, err = channel.QueueDeclare(name, durable, autoDelete, exclusive, noWait, nil)
+		channelPools.Put(channel)
 		if err == nil {
 			log.Debug("[" + name + "] queueDeclare success")
 			return
 		}
-		//log.Debugf("channel.queueDeclare:%s", err)
 		channel, err = getMqChannel()
 		if err == nil {
 			_, err = channel.QueueDelete(name, false, false, false)
+			channelPools.Put(channel)
 			if err != nil {
 				log.Errorf("channel.QueueDelete("+name+", false, false, false):%s", err)
 			} else {
@@ -71,16 +71,17 @@ RETRY:
 			retryCount++
 			goto RETRY
 		} else {
+			channelPools.Put(channel)
 			log.Errorf("getMqChannel [for QueueDelete]:%s", err)
 		}
 	} else {
+		channelPools.Put(channel)
 		log.Errorf("getMqChannel [for QueueDeclare]:%s", err)
 	}
 	return
 }
 
 func exchangeDeclare(name, kind string, durable bool) (channel *amqp.Channel, err error) {
-	defer func() { channelPools.Put(channel) }()
 	autoDelete, internal, noWait := true, false, false
 	if durable {
 		autoDelete = false
@@ -94,14 +95,15 @@ RETRY:
 	channel, err = getMqChannel()
 	if err == nil {
 		err = channel.ExchangeDeclare(name, kind, durable, autoDelete, internal, noWait, nil)
+		channelPools.Put(channel)
 		if err == nil {
 			log.Debug("[" + name + "] ExchangeDeclare success")
 			return
 		}
-		//log.Debugf("channel.ExchangeDeclare:%s", err)
 		channel, err = getMqChannel()
 		if err == nil {
 			err = channel.ExchangeDelete(name, false, false)
+			channelPools.Put(channel)
 			if err != nil {
 				log.Errorf("channel.ExchangeDelete("+name+", false, false):%s", err)
 			} else {
@@ -110,9 +112,11 @@ RETRY:
 			retryCount++
 			goto RETRY
 		} else {
+			channelPools.Put(channel)
 			log.Errorf("getMqChannel [for ExchangeDelete]:%s", err)
 		}
 	} else {
+		channelPools.Put(channel)
 		log.Errorf("getMqChannel [for ExchangeDeclare]:%s", err)
 	}
 	return
