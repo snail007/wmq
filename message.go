@@ -9,6 +9,8 @@ import (
 
 	"runtime"
 
+	"strings"
+
 	"github.com/Jeffail/gabs"
 	"github.com/streadway/amqp"
 )
@@ -28,33 +30,6 @@ type consumer struct {
 	Timeout  float64
 }
 
-// func initMessages() {
-// 	for _, msg := range messages {
-// 		messageDeclare(msg)
-// 	}
-// 	go func() {
-// 		for {
-// 			m := <-startMessageSignals
-// 			err := messageDeclare(m)
-// 			if err == nil {
-// 				log.Debugf("start message success , exchange:%s", m.Name)
-// 				for _, c := range m.Consumers {
-// 					restartConsumer(m, c)
-// 				}
-// 			}
-// 			log.Debugf("message restarted [%s]", m.Name)
-// 			time.Sleep(time.Second * 5)
-// 		}
-// 	}()
-// }
-// func pushMessageStarSingal(msg message) bool {
-// 	select {
-// 	case startMessageSignals <- msg:
-// 		return true
-// 	default:
-// 		return false
-// 	}
-// }
 func parseMessages(str string) (messages []message, err error) {
 	defer func(err *error) {
 		e := recover()
@@ -119,7 +94,50 @@ func getConsumer(msgMame, consumerID string) (consumer *consumer, msgIndex, cons
 	err = errors.New("consumer not found")
 	return
 }
+func statusMessage(messageName string) (jsonData string, err error) {
+	m, _, err := getMessage(messageName)
+	if err != nil {
+		return
+	}
+	var ja []string
 
+	for _, c := range m.Consumers {
+		j, _ := statusConsumer(m.Name, c.ID)
+		ja = append(ja, j.String())
+	}
+	jsonData = "[" + strings.Join(ja, ",") + "]"
+	return
+}
+func statusConsumer(messageName, consumerID string) (json *gabs.Container, err error) {
+	c, i, _, e := getConsumer(messageName, consumerID)
+	if e != nil {
+		return nil, e
+	}
+	m := messages[i]
+	var q amqp.Queue
+	//var ch *amqp.Channel
+	//ch, _ = getMqChannel()
+	//q, e = ch.QueueDeclare(getConsumerKey(m, *c), m.Durable, !m.Durable, false, false, nil)
+	//defer channelPools.Put(ch)
+	q, _, e = queueDeclare(getConsumerKey(m, *c), m.Durable)
+	if e != nil {
+		return nil, e
+	}
+	count := q.Messages
+	var jsonObj = gabs.New()
+	jsonObj.Set(count, "Count")
+	jsonObj.Set(consumerID, "ID")
+	jsonObj.Set(messageName, "MsgName")
+	jsonObj.Set("0", "LastTime")
+	lasttime, e := statusConsumerWorker(*c, m)
+	if e == nil {
+		jsonObj.Set(lasttime, "LastTime")
+	}
+	//jsonObj.StringIndent("", "  ")
+	//json = jsonObj.String()
+	json = jsonObj
+	return
+}
 func addMessage(m message) (err error) {
 	messages = append(messages, m)
 	log.Infof("message [ %s ] was added", m.Name)
@@ -347,22 +365,37 @@ func initConsumerManager() {
 							log.Warnf("consumer[%s] goroutine exited", c.key)
 						}()
 						for {
+						RETRY:
 							if _, ok := wrapedConsumers[c.key]; !ok {
 								log.Warn("consumer[ %s ] not found , now exit", c.key)
 								runtime.Goexit()
 							}
 							//update consumer active time
 							wrapedConsumers[c.key].lasttime = time.Now().Unix()
-							channel, err := channelPools.Get()
+							conn, err := pools.Get()
 							if err != nil {
-								channelPools.Put(channel)
+								pools.Put(conn)
+								log.Warn("get conn fail for consumer , sleep 3 seconds ... %s", err)
+								time.Sleep(time.Second * 3)
+								continue
+							}
+							channel, err := conn.(*amqp.Connection).Channel()
+							if err != nil {
+								pools.Put(conn)
 								log.Warn("get channel fail for consumer , sleep 3 seconds ... %s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
-							deliveryChn, err := channel.(*amqp.Channel).Consume(c.key, "", false, false, false, false, nil)
+							err = channel.Qos(1, 0, false)
 							if err != nil {
-								channelPools.Put(channel)
+								pools.Put(conn)
+								log.Warn("set channel Qos fail for consumer , sleep 3 seconds ... %s", err)
+								time.Sleep(time.Second * 3)
+								continue
+							}
+							deliveryChn, err := channel.Consume(c.key, "", false, false, false, false, nil)
+							if err != nil {
+								pools.Put(conn)
 								log.Warn("get deliveryChn fail for consumer , sleep 3 seconds ...%s", err)
 								time.Sleep(time.Second * 3)
 								continue
@@ -377,18 +410,25 @@ func initConsumerManager() {
 								select {
 								case cmd := <-wrapedConsumers[c.key].consumerReadChan:
 									if cmd == "exit" {
-										channel.(*amqp.Channel).Close()
-										channelPools.Put(channel)
+										pools.Put(conn)
 										wrapedConsumers[c.key].consumerWriteChan <- "exit_ok"
 										runtime.Goexit()
 									}
 								case delivery, ok := <-deliveryChn:
 									if !ok {
-										channelPools.Put(channel)
+										pools.Put(conn)
 										log.Warn("get delivery fail for consumer")
-										break
+										goto RETRY
+									}
+									//process success
+									err := delivery.Ack(false)
+									//process fail
+									//err := delivery.Nack(false, true)
+									if err != nil {
+										log.Warnf("consumer %s ack/nack fail , %s", c.key, err)
 									}
 									log.Debugf("delivery revecived [ %s ] : %s", c.key, string(delivery.Body))
+									time.Sleep(time.Second * 10)
 								}
 							}
 						}

@@ -70,48 +70,49 @@ func main() {
 		//     "Mode": "topic",
 		//     "Name": "test",
 		//     "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
-		time.Sleep(time.Second * 5)
-		addMessage(message{
-			Name:        "vaddtest",
-			Durable:     false,
-			IsNeedToken: true,
-			Mode:        "fanout",
-			Token:       "fadafasdfs",
-		})
+		// time.Sleep(time.Second * 5)
+		// addMessage(message{
+		// 	Name:        "vaddtest",
+		// 	Durable:     false,
+		// 	IsNeedToken: true,
+		// 	Mode:        "fanout",
+		// 	Token:       "fadafasdfs",
+		// })
 		// status, _ := statusConsumer(messages[0].Consumers[0], messages[0])
 		// i, _ := strconv.ParseInt(status, 10, 64)
 		// log.Infof("%d,%s", i, time.Unix(i, 0).Format("2006-01-02 15:04:05"))
 
 		// time.Sleep(time.Second * 30)
 		// deleteConsumer(messages[0], messages[0].Consumers[0])
-		time.Sleep(time.Second * 5)
-		addConsumer(messages[1], consumer{
-			ID:       "1212121",
-			RouteKey: "",
-		})
+		// time.Sleep(time.Second * 5)
+		// addConsumer(messages[1], consumer{
+		// 	ID:       "1212121",
+		// 	RouteKey: "",
+		// })
 		// publish("hello world", "addtest", "", "fadafasdfs")
 
-		time.Sleep(time.Second * 5)
-		err := publish("hello world 00000000000", "vaddtest", "", "fadafasdfs")
-		if err != nil {
-			log.Errorf("%s", err)
-		}
-		time.Sleep(time.Second * 5)
-		updateMessage(message{
-			Name:        "vaddtest",
-			Durable:     false,
-			IsNeedToken: true,
-			Mode:        "topic",
-			Token:       "fadafasdfs",
-		})
-		time.Sleep(time.Second * 5)
-		deleteMessage(message{
-			Name:        "vaddtest",
-			Durable:     false,
-			IsNeedToken: true,
-			Mode:        "topic",
-			Token:       "fadafasdfs",
-		})
+		// time.Sleep(time.Second * 5)
+
+		// err := publish("hello world 00000000000", "vaddtest", "", "fadafasdfs")
+		// if err != nil {
+		// 	log.Errorf("%s", err)
+		// }
+		// time.Sleep(time.Second * 5)
+		// updateMessage(message{
+		// 	Name:        "vaddtest",
+		// 	Durable:     false,
+		// 	IsNeedToken: true,
+		// 	Mode:        "topic",
+		// 	Token:       "fadafasdfs",
+		// })
+		// time.Sleep(time.Second * 5)
+		// deleteMessage(message{
+		// 	Name:        "vaddtest",
+		// 	Durable:     false,
+		// 	IsNeedToken: true,
+		// 	Mode:        "topic",
+		// 	Token:       "fadafasdfs",
+		// })
 		// time.Sleep(time.Second * 30)
 		// messages[0].Consumers[1].URL = "333 URL"
 		//deleteConsumer(messages[0], messages[0].Consumers[1])
@@ -136,13 +137,15 @@ func main() {
 		// 	RouteKey: "test",
 		// })
 		//log.Debug("waiting...")
-		// for {
-		// 	time.Sleep(time.Second * 3)
-		// 	err := publish("hello world", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J")
-		// 	if err != nil {
-		// 		log.Errorf("publish %s ", err)
-		// 	}
-		// }
+		for {
+			time.Sleep(time.Second * 3)
+			err := publish("hello world", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J")
+			if err != nil {
+				log.Errorf("publish %s ", err)
+			}
+			a, _ := statusMessage("test")
+			log.Infof("%s  %s", a, err)
+		}
 	}()
 	select {}
 }
