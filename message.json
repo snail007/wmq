@@ -1,0 +1,23 @@
+[{
+    "Comment": "",
+    "Consumers": [{
+            "Comment": "",
+            "ID": "111",
+            "RouteKey": "#",
+            "Timeout": 5000,
+            "URL": "http://gitcode.com/wmq.php"
+        },
+        {
+            "Comment": "",
+            "ID": "222",
+            "RouteKey": "test",
+            "Timeout": 5000,
+            "URL": "http://gitcode.com/test/gzip.php"
+        }
+    ],
+    "Durable": false,
+    "IsNeedToken": true,
+    "Mode": "topic",
+    "Name": "test",
+    "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
+}]

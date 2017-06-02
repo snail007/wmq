@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	"time"
 
@@ -11,8 +12,13 @@ import (
 
 	"strings"
 
+	"io/ioutil"
+
+	"sync"
+
 	"github.com/Jeffail/gabs"
 	"github.com/streadway/amqp"
+	"gopkg.in/resty.v0"
 )
 
 type message struct {
@@ -22,13 +28,19 @@ type message struct {
 	Mode        string
 	Name        string
 	Token       string
+	Comment     string
 }
 type consumer struct {
 	ID       string
 	URL      string
 	RouteKey string
 	Timeout  float64
+	Comment  string
 }
+
+var (
+	msgLock = &sync.Mutex{}
+)
 
 func parseMessages(str string) (messages []message, err error) {
 	defer func(err *error) {
@@ -94,6 +106,13 @@ func getConsumer(msgMame, consumerID string) (consumer *consumer, msgIndex, cons
 	err = errors.New("consumer not found")
 	return
 }
+func config() (jsonData string, err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
+	j, err := json.Marshal(messages)
+	jsonData = string(j)
+	return
+}
 func statusMessage(messageName string) (jsonData string, err error) {
 	m, _, err := getMessage(messageName)
 	if err != nil {
@@ -109,6 +128,8 @@ func statusMessage(messageName string) (jsonData string, err error) {
 	return
 }
 func statusConsumer(messageName, consumerID string) (json *gabs.Container, err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
 	c, i, _, e := getConsumer(messageName, consumerID)
 	if e != nil {
 		return nil, e
@@ -139,12 +160,16 @@ func statusConsumer(messageName, consumerID string) (json *gabs.Container, err e
 	return
 }
 func addMessage(m message) (err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
 	messages = append(messages, m)
 	log.Infof("message [ %s ] was added", m.Name)
 	initMessages()
 	return nil
 }
 func updateMessage(m message) (err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
 	_, i, e := getMessage(m.Name)
 	if e != nil {
 		err = e
@@ -165,6 +190,8 @@ func updateMessage(m message) (err error) {
 	return
 }
 func deleteMessage(m message) (err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
 	msg, i, e := getMessage(m.Name)
 	if e != nil {
 		err = e
@@ -192,6 +219,8 @@ func deleteMessage(m message) (err error) {
 	return
 }
 func addConsumer(msg message, c0 consumer) (err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
 	//add it to messages
 	var i int
 	_, i, err = getMessage(msg.Name)
@@ -207,6 +236,8 @@ func addConsumer(msg message, c0 consumer) (err error) {
 }
 
 func updateConsumer(msg message, c0 consumer) (err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
 	_, i, k, e := getConsumer(msg.Name, c0.ID)
 	if e != nil {
 		return e
@@ -220,6 +251,8 @@ func updateConsumer(msg message, c0 consumer) (err error) {
 }
 
 func deleteConsumer(msg message, c0 consumer) (err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
 	_, i0, i, _ := getConsumer(msg.Name, c0.ID)
 	//delete messages consumer
 	messages[i0].Consumers = append(messages[i0].Consumers[:i], messages[i0].Consumers[i+1:]...)
@@ -334,21 +367,52 @@ func initMessages() {
 		}
 	}
 }
+func restart() (err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
+	err = stopAllConsumer()
+	if err != nil {
+		return
+	}
+	initMessages()
+	return
+}
+func reload() {
+	msgLock.Lock()
+	defer msgLock.Unlock()
+	initMessages()
+}
+func stopAllConsumer() (err error) {
+	for _, m := range messages {
+		for _, c := range m.Consumers {
+			_, err = stopConsumerWorker(c, m)
+			if err != nil {
+				return
+			}
+		}
+	}
+	return
+}
 func initConsumerManager() {
 	wrapedConsumers := make(map[string]*manageConsumer)
 	go func() {
 		log.Debugf("Consumer Manager started")
+		//Consumer Manager worker loop,waiting for control command and exec switch
 		for {
+			//waiting for control data
 			wrapedConsumer := <-consumerManageReadChan
+
 			log.Debugf("revecived consumer[%s]", wrapedConsumer.action)
+			//preprocess for control data
 			c := &manageConsumer{
 				wrapedConsumer:    wrapedConsumer,
 				consumerReadChan:  make(chan string, 1),
 				consumerWriteChan: make(chan string, 1),
 				key:               getConsumerKey(wrapedConsumer.message, wrapedConsumer.consumer),
 			}
+			//decide what to do
 			switch wrapedConsumer.action {
-			case "update":
+			case "update": //update or insert consumer
 				t := "update"
 				if _, ok := wrapedConsumers[c.key]; !ok {
 					t = "insert"
@@ -364,49 +428,86 @@ func initConsumerManager() {
 							delete(wrapedConsumers, c.key)
 							log.Warnf("consumer[%s] goroutine exited", c.key)
 						}()
+						//0.consumer worker start
 						for {
 						RETRY:
+							//1.check if exists in wrapedConsumers data
 							if _, ok := wrapedConsumers[c.key]; !ok {
-								log.Warn("consumer[ %s ] not found , now exit", c.key)
+								log.Warnf("consumer[ %s ] not found , now exit", c.key)
 								runtime.Goexit()
 							}
 							//update consumer active time
 							wrapedConsumers[c.key].lasttime = time.Now().Unix()
+							//2.try get connection
 							conn, err := pools.Get()
 							if err != nil {
 								pools.Put(conn)
-								log.Warn("get conn fail for consumer , sleep 3 seconds ... %s", err)
+								log.Warnf("get conn fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
+							//3.try get channel on connecton
 							channel, err := conn.(*amqp.Connection).Channel()
 							if err != nil {
 								pools.Put(conn)
-								log.Warn("get channel fail for consumer , sleep 3 seconds ... %s", err)
+								log.Warnf("get channel fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
+							//4.try  declare exchange  on channel
+							_, err = exchangeDeclare(wrapedConsumers[c.key].message.Name,
+								wrapedConsumers[c.key].message.Mode,
+								wrapedConsumers[c.key].message.Durable)
+							if err != nil {
+								pools.Put(conn)
+								log.Warnf("exchangeDeclare() fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
+								time.Sleep(time.Second * 3)
+								continue
+							}
+							//5.try  declare queue  on channel
+							_, _, err = queueDeclare(getConsumerKey(wrapedConsumers[c.key].message, wrapedConsumers[c.key].consumer),
+								wrapedConsumers[c.key].message.Durable)
+							if err != nil {
+								pools.Put(conn)
+								log.Warnf("queueDeclare() fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
+								time.Sleep(time.Second * 3)
+								continue
+							}
+							//6.try  bind queue to exchange
+							err = queueBindToExchange(getConsumerKey(wrapedConsumers[c.key].message, wrapedConsumers[c.key].consumer),
+								wrapedConsumers[c.key].message.Name,
+								wrapedConsumers[c.key].consumer.RouteKey)
+							if err != nil {
+								pools.Put(conn)
+								log.Warnf("queueBindToExchange() fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
+								time.Sleep(time.Second * 3)
+								continue
+							}
+							//7.try  set qos on channel
 							err = channel.Qos(1, 0, false)
 							if err != nil {
 								pools.Put(conn)
-								log.Warn("set channel Qos fail for consumer , sleep 3 seconds ... %s", err)
+								log.Warnf("set channel Qos fail for consumer , sleep 3 seconds ... %s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
+							//8.try consume queue
 							deliveryChn, err := channel.Consume(c.key, "", false, false, false, false, nil)
 							if err != nil {
 								pools.Put(conn)
-								log.Warn("get deliveryChn fail for consumer , sleep 3 seconds ...%s", err)
+								log.Warnf("get deliveryChn fail for consumer , sleep 3 seconds ...%s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
+							//worker loop,use chan waiting for control command or delivery
 							for {
 								if _, ok := wrapedConsumers[c.key]; !ok {
-									log.Warn("consumer[ %s ] not found , now exit", c.key)
+									log.Warnf("consumer[ %s ] not found , now exit", c.key)
 									runtime.Goexit()
 								}
 								//update consumer active time
 								wrapedConsumers[c.key].lasttime = time.Now().Unix()
+								log.Infof("Consumer [ %s ] waiting for message ...", c.key)
 								select {
 								case cmd := <-wrapedConsumers[c.key].consumerReadChan:
 									if cmd == "exit" {
@@ -417,33 +518,35 @@ func initConsumerManager() {
 								case delivery, ok := <-deliveryChn:
 									if !ok {
 										pools.Put(conn)
-										log.Warn("get delivery fail for consumer")
+										log.Warnf("get delivery fail for consumer")
 										goto RETRY
 									}
-									//process success
-									err := delivery.Ack(false)
-									//process fail
-									//err := delivery.Nack(false, true)
+									log.Debugf("delivery revecived [ %s ] : %s", c.key, string(delivery.Body)[0:20]+"...")
+									if process(string(delivery.Body), c.consumer) == nil {
+										//process success
+										err = delivery.Ack(false)
+									} else {
+										//process fail
+										err = delivery.Nack(false, true)
+									}
 									if err != nil {
 										log.Warnf("consumer %s ack/nack fail , %s", c.key, err)
 									}
-									log.Debugf("delivery revecived [ %s ] : %s", c.key, string(delivery.Body))
-									time.Sleep(time.Second * 10)
+									time.Sleep(time.Second * 5)
 								}
 							}
 						}
 					}()
 				}
 				consumerManageWriteChan <- "completed"
-			case "delete":
-				//stop consumer
+			case "delete": //stop consumer
 				if _, ok := wrapedConsumers[c.key]; ok {
 					log.Debugf("sending stop singal to consumer[%s] goroutine ...", c.key)
 					wrapedConsumers[c.key].consumerReadChan <- "exit"
 					log.Debugf("send  stop singal to consumer[%s] goroutine success", c.key)
 				}
 				consumerManageWriteChan <- "completed"
-			case "status":
+			case "status": //get consumer last active time
 				v, ok := wrapedConsumers[c.key]
 				var t int64
 				if ok {
@@ -455,4 +558,91 @@ func initConsumerManager() {
 			}
 		}
 	}()
+}
+func writeMessagesToFile(messages0 []message, configFilePath0 string) (err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
+	b, err := json.Marshal(messages0)
+	c, err := gabs.ParseJSON(b)
+	content := c.StringIndent("", "	")
+	err = ioutil.WriteFile(configFilePath0, []byte(content), 0600)
+	return
+}
+func loadMessagesFromFile(configFilePath0 string) (messages0 []message, err error) {
+	msgLock.Lock()
+	defer msgLock.Unlock()
+	if _, err := os.Stat(configFilePath0); os.IsNotExist(err) {
+		err = ioutil.WriteFile(configFilePath0, []byte("[]"), 0600)
+	} else {
+		var content string
+		content, err = fileGetContents(configFilePath0)
+		if err == nil {
+			messages0, err = parseMessages(content)
+			if err == nil {
+				messages = messages0
+			}
+		}
+	}
+	return
+}
+
+func process(content string, c consumer) (err error) {
+	//content = "{\"body\":\"sss\",\"header\":{\"ID\":\"test\"},\"ip\":\"127.0.0.1\",\"method\":\"get\"}"
+	jsonParsed, err := gabs.ParseJSON([]byte(content))
+	if err != nil {
+		log.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content)
+		return nil
+	}
+
+	if !jsonParsed.Exists("body") || !jsonParsed.Exists("header") ||
+		!jsonParsed.Exists("ip") || !jsonParsed.Exists("method") || !jsonParsed.Exists("args") {
+		log.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content)
+		return nil
+	}
+
+	body := jsonParsed.S("body").Data()
+	header, _ := jsonParsed.S("header").ChildrenMap()
+	ip := jsonParsed.S("ip").Data().(string)
+	args := jsonParsed.S("args").Data().(string)
+	method := jsonParsed.S("method").Data().(string)
+	url := c.URL
+	if args != "" {
+		if strings.Contains(c.URL, "?") {
+			url = c.URL + "&" + args
+		} else {
+			url = c.URL + "?" + args
+		}
+	}
+	//log.Warnf("body:%s", body)
+	var headerMap = make(map[string]string)
+	for k, child := range header {
+		headerMap[k] = child.Data().(string)
+		log.Warnf("%s:%s", k, child.Data())
+	}
+	//log.Warnf("method:%s", method)
+	client := resty.New().
+		SetTimeout(time.Millisecond*time.Duration(c.Timeout)).R().
+		SetHeaders(headerMap).
+		SetHeader("X-Forward-For", ip).
+		SetHeader("User-Agent", "wmq v0.1 - https://github.com/snail007/wmq")
+	var resp *resty.Response
+	if method == "post" {
+		resp, err = client.SetBody(body).Post(url)
+	} else if method == "get" {
+		resp, err = client.Get(url)
+	} else {
+		err = fmt.Errorf("method [ %s ] not supported", method)
+	}
+	if err != nil {
+		log.Warnf("consume fail [ %s ] %s", c.URL, err)
+		return
+	}
+	code := resp.StatusCode()
+	if code != 200 {
+		err = fmt.Errorf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
+		log.Warnf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
+	} else {
+		log.Debugf("consume success , %s", c.URL)
+	}
+	return
 }

@@ -1,0 +1,28 @@
+1.add a message
+    addMessage(m message) (err error) 
+2.update a message
+    updateMessage(m message) (err error)
+3.delete a message
+    deleteMessage(m message) (err error)
+4.add a consumer
+    addConsumer(msg message, c0 consumer) (err error)
+5.update a consumer
+    updateConsumer(msg message, c0 consumer) (err error)
+6.delete a consumer
+    deleteConsumer(msg message, c0 consumer) (err error)
+7.publish a message
+    publish(body, exchangeName, routeKey, token string) (err error)
+8.restart service
+    restart() (err error) 
+9.reload service
+    reload()
+10.get config  
+    config() (jsonData string, err error)
+11.get all consumer status of a message
+    statusMessage(messageName string) (jsonData string, err error)
+12.get a consumer status
+    statusConsumer(messageName, consumerID string) (json *gabs.Container, err error)
+13.write messages in memory to message data file
+    func writeMessagesToFile() (err error)
+14.load message data file to messages in memory 
+    func loadMessagesFromFile() (messages0 []message, err error)

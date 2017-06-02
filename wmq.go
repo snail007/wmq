@@ -21,33 +21,15 @@ var (
 	mqHeartbeat                    = time.Second * 2
 	mqConnectionAndDeadlineTimeout = time.Second * 4
 	mqConnectionFailRetrySleep     = time.Second * 3
-
-	log      = logrus.New()
-	messages = []message{}
+	messageDataFilePath            = "message.json"
+	log                            = logrus.New()
+	messages                       = []message{}
 )
 
 func main() {
 
-	log.Info("service started")
-	// for i := 0; i < 10; i++ {
-	// exchangeDeclare("test", "fanout", true)
-	// exchangeDeclare("test", "fanout", false)
-	// }
-	// queueDeclare("test111", true)
-	// queueDeclare("test111", false)
-	// queueBindToExchange("test111", "test", "")
-	// err := publish("hello haha", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J", 2)
-	// if err != nil {
-	// 	log.Error(err)
-	// } else {
-	// 	log.Info("send SUCCESS")
-	// }
-
-	initConsumerManager()
-
-	initMessages()
-
 	go func() {
+		//process("aaa", consumer{URL: "http://gitcode.com/wmq.php", Timeout: 3000})
 		// for {
 		// time.Sleep(time.Second * 5)
 		// messages[0].Consumers[0].URL = "init url"
@@ -83,6 +65,10 @@ func main() {
 		// log.Infof("%d,%s", i, time.Unix(i, 0).Format("2006-01-02 15:04:05"))
 
 		// time.Sleep(time.Second * 30)
+		// if writeConfigToFile(messages, configFilePath) == nil {
+		// 	log.Info("write success")
+		// }
+		//reload()
 		// deleteConsumer(messages[0], messages[0].Consumers[0])
 		// time.Sleep(time.Second * 5)
 		// addConsumer(messages[1], consumer{
@@ -92,7 +78,7 @@ func main() {
 		// publish("hello world", "addtest", "", "fadafasdfs")
 
 		// time.Sleep(time.Second * 5)
-
+		// log.Info(config())
 		// err := publish("hello world 00000000000", "vaddtest", "", "fadafasdfs")
 		// if err != nil {
 		// 	log.Errorf("%s", err)
@@ -137,15 +123,15 @@ func main() {
 		// 	RouteKey: "test",
 		// })
 		//log.Debug("waiting...")
-		for {
-			time.Sleep(time.Second * 3)
-			err := publish("hello world", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J")
-			if err != nil {
-				log.Errorf("publish %s ", err)
-			}
-			a, _ := statusMessage("test")
-			log.Infof("%s  %s", a, err)
-		}
+		// for {
+		// 	time.Sleep(time.Second * 3)
+		// 	err := publish("hello world", "test", "test", "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J")
+		// 	if err != nil {
+		// 		log.Errorf("publish %s ", err)
+		// 	}
+		// 	a, _ := statusMessage("test")
+		// 	log.Infof("%s  %s", a, err)
+		// }
 	}()
 	select {}
 }
@@ -161,11 +147,11 @@ func init() {
 	if strings.Contains(p, "/Users") {
 		uri = "amqp://guest:guest@127.0.0.1:5672/"
 	}
-	content, err := fileGetContents("a.json")
-	fatal("get config file fail", err)
-	messages, err = parseMessages(content)
-	fatal("parse config file fail", err)
 
+	messages, err = loadMessagesFromFile(messageDataFilePath)
+	if err != nil {
+		log.Fatalf("load message data form file fail [%s],%s", messageDataFilePath, err)
+	}
 	if err = initPool(); err != nil {
 		log.Fatalf("init connection to rabbitmq fail : %s", err)
 
@@ -174,15 +160,12 @@ func init() {
 		log.Fatalf("init Channel Pool fail : %s", err)
 	}
 
-	//end init var
-
-	// b, _ := json.Marshal(messages)
-	// c, _ := gabs.ParseJSON(b)
-	// log.Info(c.StringIndent("", "	"))
-
-}
-func fatal(flag string, err interface{}) {
-	if err != nil {
-		log.Fatalf(flag+":%s", err)
-	}
+	//init service
+	log.Info("WMQ Service Started")
+	initConsumerManager()
+	initMessages()
+	//init api service
+	go serveAPI(3302, "abc")
+	//init publish service
+	go servePublish(3303)
 }
