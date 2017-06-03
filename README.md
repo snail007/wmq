@@ -1,7 +1,7 @@
 # WMQ
 wrapped  message queue which based on rabbitmq,support http protocol
 # Usage:
-<pre>
+<pre style="overflow:hidden">
 Usage of wmq:
       --api-disable                  disable api service
       --api-token string             access api token (default "guest")
