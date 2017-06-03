@@ -7,7 +7,8 @@ Usage of /tmp/go-build822921089/command-line-arguments/_obj/exe/api:
       --api-token string             access api token (default "guest")
       --data-example                 print example of data-file
       --data-file string             which file will store messages (default "message.json")
-      --fail-wait int                access consumer url  fail and then how many milliseconds to                                     sleep (default 50000)
+      --fail-wait int                access consumer url  fail and then how many milliseconds to
+                                     sleep (default 50000)
       --ignore-headers stringSlice   these http headers will be ignored when access to 
                                      consumer's url , multiple splitted by comma(,)
       --listen-api string            api service listening port (default "0.0.0.0:3302")
@@ -18,7 +19,8 @@ Usage of /tmp/go-build822921089/command-line-arguments/_obj/exe/api:
       --mq-prefix string             the queue and exchange default prefix (default "wmq.")
       --mq-username string           which username be used when connect to RabbitMQ (default "guest")
       --mq-vhost string              which vhost be used when connect to RabbitMQ (default "/")
-      --realip-header string         the publisher's real ip will be set in this http header when                                    access to consumer's url (default "X-Forwarded-For")
+      --realip-header string         the publisher's real ip will be set in this http header when
+                                     access to consumer's url (default "X-Forwarded-For")
       --version                      show version about current WMQ
 </pre>
 
