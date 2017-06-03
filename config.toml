@@ -6,7 +6,7 @@ publish = "0.0.0.0:3303"
 #disable or not api service
 disable = false
 #access api token
-token = "abc123"
+token = "guest"
 
 [publish]
 #these http headers will be ignored when access to consumer's url
