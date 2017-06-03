@@ -39,8 +39,14 @@ func getMqChannel() (channel *amqp.Channel, err error) {
 	log.Errorf("channelPools.Get() fail in exists channelPools:%s", err)
 	return
 }
-
+func getQueueName(queueName string) string {
+	return cfg.GetString("rabbitmq.prefix") + queueName
+}
+func getExchangeName(exchangeName string) string {
+	return cfg.GetString("rabbitmq.prefix") + exchangeName
+}
 func queueDeclare(name string, durable bool) (queue amqp.Queue, channel *amqp.Channel, err error) {
+	name = getQueueName(name)
 	autoDelete, exclusive, noWait := true, false, false
 	if durable {
 		autoDelete = false
@@ -82,6 +88,7 @@ RETRY:
 }
 
 func exchangeDeclare(name, kind string, durable bool) (channel *amqp.Channel, err error) {
+	name = getExchangeName(name)
 	autoDelete, internal, noWait := true, false, false
 	if durable {
 		autoDelete = false
@@ -123,6 +130,8 @@ RETRY:
 }
 
 func queueBindToExchange(queuename, exchangeName, routeKey string) (err error) {
+	queuename = getQueueName(queuename)
+	exchangeName = getExchangeName(exchangeName)
 	var channel *amqp.Channel
 	channel, err = getMqChannel()
 	defer func() { channelPools.Put(channel) }()
@@ -138,6 +147,7 @@ func queueBindToExchange(queuename, exchangeName, routeKey string) (err error) {
 }
 
 func deleteQueue(queueName string) (err error) {
+	queueName = getQueueName(queueName)
 	var channel *amqp.Channel
 	defer func() { channelPools.Put(channel) }()
 	channel, err = getMqChannel()
@@ -154,6 +164,7 @@ func deleteQueue(queueName string) (err error) {
 	return
 }
 func deleteExchange(exchangeName string) (err error) {
+	exchangeName = getExchangeName(exchangeName)
 	var channel *amqp.Channel
 	channel, err = getMqChannel()
 	defer func() { channelPools.Put(channel) }()

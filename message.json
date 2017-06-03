@@ -3,6 +3,8 @@
     "Consumers": [{
             "Comment": "",
             "ID": "111",
+            "Code": 200,
+            "CheckCode": true,
             "RouteKey": "#",
             "Timeout": 5000,
             "URL": "http://gitcode.com/wmq.php"
@@ -10,6 +12,8 @@
         {
             "Comment": "",
             "ID": "222",
+            "Code": 200,
+            "CheckCode": true,
             "RouteKey": "test",
             "Timeout": 5000,
             "URL": "http://gitcode.com/test/gzip.php"

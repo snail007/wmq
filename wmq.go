@@ -1,9 +1,6 @@
 package main
 
 import (
-	"path/filepath"
-	"strings"
-
 	"time"
 
 	"fmt"
@@ -20,11 +17,11 @@ const (
 )
 
 var (
-	uri                            = "amqp://gome:gome@10.125.207.4:5672/"
+	uri                            = ""
 	mqHeartbeat                    = time.Second * 2
 	mqConnectionAndDeadlineTimeout = time.Second * 4
 	mqConnectionFailRetrySleep     = time.Second * 3
-	messageDataFilePath            = "message.json"
+	messageDataFilePath            = ""
 	log                            = logrus.New()
 	messages                       = []message{}
 )
@@ -33,9 +30,12 @@ func main() {
 	//init service
 	log.Info("WMQ Service Started")
 	initConsumerManager()
+
 	initMessages()
-	//init api service
-	go serveAPI(3302, "abc")
+	if !cfg.GetBool("api-disable") {
+		//init api service
+		go serveAPI(cfg.GetInt("listen.api"), cfg.GetString("api.token"))
+	}
 	//init publish service
 	go servePublish(3303)
 	select {}
@@ -52,11 +52,13 @@ func init() {
 
 	initLog()
 
-	p, _ := filepath.Abs("./")
-	if strings.Contains(p, "/Users") {
-		uri = "amqp://guest:guest@127.0.0.1:5672/"
-	}
-
+	uri = fmt.Sprintf("amqp://%s:%s@%s:%d%s",
+		cfg.GetString("rabbitmq.username"),
+		cfg.GetString("rabbitmq.password"),
+		cfg.GetString("rabbitmq.host"),
+		cfg.GetInt("rabbitmq.port"),
+		cfg.GetString("rabbitmq.vhost"))
+	messageDataFilePath = cfg.GetString("consume.DataFile")
 	messages, err = loadMessagesFromFile(messageDataFilePath)
 	if err != nil {
 		log.Fatalf("load message data form file fail [%s],%s", messageDataFilePath, err)

@@ -31,11 +31,13 @@ type message struct {
 	Comment     string
 }
 type consumer struct {
-	ID       string
-	URL      string
-	RouteKey string
-	Timeout  float64
-	Comment  string
+	ID        string
+	URL       string
+	RouteKey  string
+	Timeout   float64
+	Code      int
+	CheckCode bool
+	Comment   string
 }
 
 var (
@@ -339,7 +341,6 @@ func notifyConsumerManager(action string, c consumer, m message) (answer string,
 func getConsumerKey(m message, c consumer) string {
 	return m.Name + c.ID
 }
-
 func initMessages() {
 	for _, m := range messages {
 		_, err := exchangeDeclare(m.Name, m.Mode, m.Durable)
@@ -492,7 +493,7 @@ func initConsumerManager() {
 								continue
 							}
 							//8.try consume queue
-							deliveryChn, err := channel.Consume(c.key, "", false, false, false, false, nil)
+							deliveryChn, err := channel.Consume(getQueueName(c.key), "", false, false, false, false, nil)
 							if err != nil {
 								pools.Put(conn)
 								log.Warnf("get deliveryChn fail for consumer , sleep 3 seconds ...%s", err)
@@ -637,10 +638,14 @@ func process(content string, c consumer) (err error) {
 		log.Warnf("consume fail [ %s ] %s", c.URL, err)
 		return
 	}
-	code := resp.StatusCode()
-	if code != 200 {
-		err = fmt.Errorf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
-		log.Warnf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
+	if c.CheckCode {
+		code := resp.StatusCode()
+		if code != c.Code {
+			err = fmt.Errorf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
+			log.Warnf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
+		} else {
+			log.Debugf("consume success , %s", c.URL)
+		}
 	} else {
 		log.Debugf("consume success , %s", c.URL)
 	}
