@@ -32,12 +32,15 @@ func main() {
 	initConsumerManager()
 
 	initMessages()
+
 	if !cfg.GetBool("api-disable") {
 		//init api service
-		go serveAPI(cfg.GetInt("listen.api"), cfg.GetString("api.token"))
+		go serveAPI(cfg.GetString("listen.api"), cfg.GetString("api.token"))
 	}
+
 	//init publish service
-	go servePublish(3303)
+	go servePublish(cfg.GetString("listen.publish"))
+
 	select {}
 }
 

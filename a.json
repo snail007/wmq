@@ -1,5 +1,7 @@
 [{
     "Consumers": [{
+            "Code": 200,
+            "CheckCode": true,
             "ID": "111",
             "URL": "http://gitcode.com/test/gzip.php",
             "Timeout": 5000,
@@ -7,6 +9,8 @@
             "Comment": ""
         },
         {
+            "Code": 200,
+            "CheckCode": true,
             "ID": "222",
             "URL": "http://gitcode.com/test/gzip.php",
             "Timeout": 5000,

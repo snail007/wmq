@@ -35,7 +35,7 @@ type consumer struct {
 	URL       string
 	RouteKey  string
 	Timeout   float64
-	Code      int
+	Code      float64
 	CheckCode bool
 	Comment   string
 }
@@ -279,7 +279,7 @@ func publish(body, exchangeName, routeKey, token string) (err error) {
 	var channel *amqp.Channel
 	channel, err = getMqChannel()
 	if err == nil {
-		err = channel.Publish(exchangeName, routeKey, false, false, amqp.Publishing{
+		err = channel.Publish(getExchangeName(exchangeName), routeKey, false, false, amqp.Publishing{
 			Body: []byte(body),
 		})
 		channelPools.Put(channel)
@@ -339,7 +339,7 @@ func notifyConsumerManager(action string, c consumer, m message) (answer string,
 	return
 }
 func getConsumerKey(m message, c consumer) string {
-	return m.Name + c.ID
+	return m.Name + "-" + c.ID
 }
 func initMessages() {
 	for _, m := range messages {
@@ -594,7 +594,6 @@ func process(content string, c consumer) (err error) {
 		log.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content)
 		return nil
 	}
-
 	if !jsonParsed.Exists("body") || !jsonParsed.Exists("header") ||
 		!jsonParsed.Exists("ip") || !jsonParsed.Exists("method") || !jsonParsed.Exists("args") {
 		log.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content)
@@ -624,8 +623,8 @@ func process(content string, c consumer) (err error) {
 	client := resty.New().
 		SetTimeout(time.Millisecond*time.Duration(c.Timeout)).R().
 		SetHeaders(headerMap).
-		SetHeader("X-Forward-For", ip).
-		SetHeader("User-Agent", "wmq v0.1 - https://github.com/snail007/wmq")
+		SetHeader(cfg.GetString("publish.RealIpHeader"), ip).
+		SetHeader("User-Agent", "wmq v"+cfg.GetString("wmq.version")+" - https://github.com/snail007/wmq")
 	var resp *resty.Response
 	if method == "post" {
 		resp, err = client.SetBody(body).Post(url)
@@ -640,7 +639,7 @@ func process(content string, c consumer) (err error) {
 	}
 	if c.CheckCode {
 		code := resp.StatusCode()
-		if code != c.Code {
+		if float64(code) != c.Code {
 			err = fmt.Errorf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
 			log.Warnf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
 		} else {

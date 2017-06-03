@@ -17,12 +17,13 @@ var (
 )
 
 func initConfig() (err error) {
-
+	cfg.SetDefault("wmq.version", "1.0")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.String("listen-api", "0.0.0.0:3302", "api service listening port")
 	pflag.String("listen-publish", "0.0.0.0:3303", "publish service listening port")
 	pflag.String("api-token", "guest", "access api token")
 	pflag.Bool("api-disable", false, "disable api service")
+	version := pflag.Bool("version", false, "show version about current WMQ")
 	example := pflag.Bool("data-example", false, "print example of data-file")
 	pflag.StringSlice("ignore-headers", []string{}, "these http headers will be ignored when access to consumer's url , multiple splitted by comma(,)")
 	pflag.String("realip-header", "X-Forwarded-For", "the publisher's real ip will be set in this http header when access to consumer's url")
@@ -35,6 +36,10 @@ func initConfig() (err error) {
 	pflag.String("mq-prefix", "wmq.", "the queue and exchange default prefix")
 	pflag.String("data-file", "message.json", "which file will store messages")
 	pflag.Parse()
+	if *version {
+		fmt.Printf("WMQ v%s - https://github.com/snail007/wmq\n", cfg.GetString("wmq.version"))
+		os.Exit(0)
+	}
 	if *example {
 		printExample()
 		os.Exit(0)
