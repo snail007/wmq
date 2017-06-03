@@ -258,7 +258,7 @@ note:default manage port is 3302
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
 </pre>
 # Publishing Message
-<pre>
+<code>
 note:default publish port is 3303
 1.publish a message 
     note:any "post body" and "get parameters" and "http header" was send to "publishing" , them will be the same as when wmq access consumer's URL
@@ -271,4 +271,4 @@ note:default publish port is 3303
             RouteKey:string     //the api token is setting in config
     response:
         httpcode:204|500      //204:menas success 500:means fail and output is error info
-</pre>
+</code>
