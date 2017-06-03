@@ -98,14 +98,17 @@ note:default manage port is 3302
             Name:string     //message name
             ID:string       //ID of consumer
             URL:string      //URL of consume message
-            Timeout:int     // milliseconds waiting for response when access url , usually : 3000
-            Code:int        //http code,this code decide the url is accessed success or fail,usually it is 200
+            Timeout:int     //milliseconds waiting for response when access url ,
+                               usually : 3000
+            Code:int        //http code,this code decide the url is accessed success or fail,
+                              usually it is 200
             CheckCode:1|0   //whether to check response http code when access url,1:true,0:false
             Comment:string  //comment of consumer
             RouteKey:string //routing key
             Token:string    //should be set when IsNeedToken is 1,other leave empty
             api-token:string//the api token is setting in config
-            callback:string //callback function name for jsonp call,if no jsonp call ,leave it empty
+            callback:string //callback function name for jsonp call,
+                              if no jsonp call ,leave it empty
     response:
         type:json
         column:
@@ -122,7 +125,8 @@ note:default manage port is 3302
             Name:string     //message name
             ID:string       //ID of consumer
             api-token:string//the api token is setting in config
-            callback:string //callback function name for jsonp call,if no jsonp call ,leave it empty
+            callback:string //callback function name for jsonp call,
+                              if no jsonp call ,leave it empty
     response:
         type:json
         column:
@@ -137,7 +141,8 @@ note:default manage port is 3302
             path:/restart
             parameters:
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
+                callback:string     //callback function name for jsonp call,
+                                      if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -152,7 +157,8 @@ note:default manage port is 3302
             path:/reload
             parameters:
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
+                callback:string     //callback function name for jsonp call,
+                                      if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -168,7 +174,8 @@ note:default manage port is 3302
             parameters:
                 Name:string         //message name
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
+                callback:string     //callback function name for jsonp call,
+                                      if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -203,7 +210,8 @@ note:default manage port is 3302
             parameters:
                 Name:string         //message name
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
+                callback:string     //callback function name for jsonp call,
+                                      if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -230,7 +238,8 @@ note:default manage port is 3302
                 Name:string         //message name
                 ID:string           //consumer's ID
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
+                callback:string     //callback function name for jsonp call,
+                                      if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -258,10 +267,11 @@ note:default manage port is 3302
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
 </pre>
 # Publishing Message
-<code>
+<pre>
 note:default publish port is 3303
 1.publish a message 
-    note:any "post body" and "get parameters" and "http header" was send to "publishing" , them will be the same as when wmq access consumer's URL
+    note:any "post body" and "get parameters" and "http header" was send to 
+        "publishing" , them will be the same as when wmq access consumer's URL
     request:
         protocol:http
         method:get or post
@@ -271,4 +281,4 @@ note:default publish port is 3303
             RouteKey:string     //the api token is setting in config
     response:
         httpcode:204|500      //204:menas success 500:means fail and output is error info
-</code>
+</pre>
