@@ -137,7 +137,7 @@ note:default manage port is 3302
             path:/restart
             parameters:
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty    response:
+                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -152,7 +152,7 @@ note:default manage port is 3302
             path:/reload
             parameters:
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty    response:
+                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -168,7 +168,7 @@ note:default manage port is 3302
             parameters:
                 Name:string         //message name
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty    response:
+                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -203,7 +203,7 @@ note:default manage port is 3302
             parameters:
                 Name:string         //message name
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty    response:
+                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
     response:
             type:json
             column:
@@ -230,7 +230,7 @@ note:default manage port is 3302
                 Name:string         //message name
                 ID:string           //consumer's ID
                 api-token:string    //the api token is setting in config
-                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty    response:
+                callback:string     //callback function name for jsonp call,if no jsonp call ,leave it empty
     response:
             type:json
             column:
