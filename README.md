@@ -75,7 +75,8 @@ note:default manage port is 3302
             Name:string     //message name
             URL:string      //URL of consume message
             Timeout:int     // milliseconds waiting for response when access url , usually : 3000
-            Code:int        //http code,this code decide the url is accessed success or fail,usually it is 200
+            Code:int        //http code,this code decide the url is accessed success or fail,
+                              usually it is 200
             CheckCode:1|0   //whether to check response http code when access url,1:true,0:false
             Comment:string  //comment of consumer
             RouteKey:string //routing key
@@ -275,7 +276,8 @@ note:default publish port is 3303
     request:
         protocol:http
         method:get or post
-        path:/:name?:query_string     //:name is the name of message ,:query_string is any query string you need
+        path:/:name?:query_string     //:name is the name of message ,
+                                        :query_string is any query string you need
         header:
             Token:string        //message's Token , if not need token ,leave it empty
             RouteKey:string     //the api token is setting in config
