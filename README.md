@@ -1,9 +1,44 @@
 # WMQ
 wrapped  message queue which based on rabbitmq,support http protocol
 # Usage:
-#wmq -h
+<pre>
+Usage of /tmp/go-build822921089/command-line-arguments/_obj/exe/api:
+      --api-disable                  disable api service
+      --api-token string             access api token (default "guest")
+      --data-example                 print example of data-file
+      --data-file string             which file will store messages (default "message.json")
+      --fail-wait int                access consumer url  fail and then how many milliseconds to                                     sleep (default 50000)
+      --ignore-headers stringSlice   these http headers will be ignored when access to 
+                                     consumer's url , multiple splitted by comma(,)
+      --listen-api string            api service listening port (default "0.0.0.0:3302")
+      --listen-publish string        publish service listening port (default "0.0.0.0:3303")
+      --mq-host string               which host be used when connect to RabbitMQ (default "127.0.0.1")
+      --mq-password string           which password be used when connect to RabbitMQ (default "guest")
+      --mq-port int                  which port be used when connect to RabbitMQ (default 5672)
+      --mq-prefix string             the queue and exchange default prefix (default "wmq.")
+      --mq-username string           which username be used when connect to RabbitMQ (default "guest")
+      --mq-vhost string              which vhost be used when connect to RabbitMQ (default "/")
+      --realip-header string         the publisher's real ip will be set in this http header when                                    access to consumer's url (default "X-Forwarded-For")
+      --version                      show version about current WMQ
+</pre>
 
-# Note
+# Publishing Message
+<pre>
+note:default publish port is 3303
+1.publish a message 
+    note:any "post body" and "get parameters" and "http header" was send to 
+        "publishing" , them will be the same as when wmq access consumer's URL
+    request:
+        protocol:http
+        method:get or post
+        path:/:name?:query_string     //:name is the name of message ,
+                                        :query_string is any query string you need
+        header:
+            Token:string        //message's Token , if not need token ,leave it empty
+            RouteKey:string     //the api token is setting in config
+    response:
+        httpcode:204|500      //204:menas success 500:means fail and output is error info
+</pre>
 
 # Management
 <pre>
@@ -266,21 +301,4 @@ note:default manage port is 3302
                             }
                  or {code:0,data:"some error"} 
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
-</pre>
-# Publishing Message
-<pre>
-note:default publish port is 3303
-1.publish a message 
-    note:any "post body" and "get parameters" and "http header" was send to 
-        "publishing" , them will be the same as when wmq access consumer's URL
-    request:
-        protocol:http
-        method:get or post
-        path:/:name?:query_string     //:name is the name of message ,
-                                        :query_string is any query string you need
-        header:
-            Token:string        //message's Token , if not need token ,leave it empty
-            RouteKey:string     //the api token is setting in config
-    response:
-        httpcode:204|500      //204:menas success 500:means fail and output is error info
 </pre>
