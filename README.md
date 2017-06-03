@@ -2,7 +2,7 @@
 wrapped  message queue which based on rabbitmq,support http protocol
 # Usage:
 <pre>
-Usage of /tmp/go-build822921089/command-line-arguments/_obj/exe/api:
+Usage of wmq:
       --api-disable                  disable api service
       --api-token string             access api token (default "guest")
       --data-example                 print example of data-file
