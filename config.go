@@ -23,6 +23,7 @@ func initConfig() (err error) {
 	pflag.String("listen-publish", "0.0.0.0:3303", "publish service listening port")
 	pflag.String("api-token", "guest", "access api token")
 	pflag.Bool("api-disable", false, "disable api service")
+	pflag.String("level", "debug", "console log level,should be one of debug,info,warn,error")
 	version := pflag.Bool("version", false, "show version about current WMQ")
 	example := pflag.Bool("data-example", false, "print example of data-file")
 	pflag.StringSlice("ignore-headers", []string{}, "these http headers will be ignored when access to consumer's url , multiple splitted by comma(,)")
@@ -35,6 +36,8 @@ func initConfig() (err error) {
 	pflag.String("mq-vhost", "/", "which vhost be used when connect to RabbitMQ")
 	pflag.String("mq-prefix", "wmq.", "the queue and exchange default prefix")
 	pflag.String("data-file", "message.json", "which file will store messages")
+	pflag.String("log-dir", "log", "the directory which store log files")
+	pflag.StringSlice("log-level", []string{"info", "error", "debug"}, "log to file level,multiple splitted by comma(,)")
 	pflag.Parse()
 	if *version {
 		fmt.Printf("WMQ v%s - https://github.com/snail007/wmq\n", cfg.GetString("wmq.version"))
@@ -58,7 +61,9 @@ func initConfig() (err error) {
 	cfg.BindPFlag("rabbitmq.password", pflag.Lookup("mq-password"))
 	cfg.BindPFlag("rabbitmq.vhost", pflag.Lookup("mq-vhost"))
 	cfg.BindPFlag("rabbitmq.prefix", pflag.Lookup("mq-prefix"))
-
+	cfg.BindPFlag("log.dir", pflag.Lookup("log-dir"))
+	cfg.BindPFlag("log.level", pflag.Lookup("log-level"))
+	cfg.BindPFlag("log.console-level", pflag.Lookup("level"))
 	cfg.SetDefault("default.IgnoreHeaders", []string{"Token", "RouteKey", "Host", "Accept-Encoding", " Content-Length", "Content-Type Connection"})
 
 	cfg.SetConfigName("config")

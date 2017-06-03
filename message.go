@@ -500,6 +500,7 @@ func initConsumerManager() {
 								time.Sleep(time.Second * 3)
 								continue
 							}
+							log.Infof("Consumer [ %s ] waiting for message ...", c.key)
 							//worker loop,use chan waiting for control command or delivery
 							for {
 								if _, ok := wrapedConsumers[c.key]; !ok {
@@ -508,7 +509,6 @@ func initConsumerManager() {
 								}
 								//update consumer active time
 								wrapedConsumers[c.key].lasttime = time.Now().Unix()
-								log.Infof("Consumer [ %s ] waiting for message ...", c.key)
 								select {
 								case cmd := <-wrapedConsumers[c.key].consumerReadChan:
 									if cmd == "exit" {

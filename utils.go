@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 )
 
@@ -44,4 +45,11 @@ func inArray(val interface{}, array interface{}) (exists bool, index int) {
 	}
 
 	return
+}
+func pathExists(_path string) bool {
+	_, err := os.Stat(_path)
+	if err != nil && os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
