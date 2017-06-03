@@ -73,7 +73,7 @@ func initConfig() (err error) {
 	cfg.AddConfigPath(".")
 	err = cfg.ReadInConfig()
 
-	if err != nil && !strings.Contains(err.Error(), "Not Found") {
+	if err != nil && !strings.Contains(err.Error(), "Not") {
 		fmt.Printf("%s", err)
 	} else {
 		fmt.Printf("use config file : %s\n", cfg.ConfigFileUsed())
