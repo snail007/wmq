@@ -3,10 +3,10 @@ package main
 import (
 	"time"
 
+	"github.com/snail007/mini-logger"
+
 	"fmt"
 	"os"
-
-	"github.com/Sirupsen/logrus"
 )
 
 const (
@@ -22,11 +22,24 @@ var (
 	mqConnectionAndDeadlineTimeout = time.Second * 4
 	mqConnectionFailRetrySleep     = time.Second * 3
 	messageDataFilePath            = ""
-	log                            = logrus.New()
 	messages                       = []message{}
 )
 
+func panicHandler(output string) {
+	fmt.Println("called" + output)
+}
 func main() {
+	defer func() {
+		logger.Flush()
+	}()
+	l1 := logger.New(false)
+	l1.AddWriter(logger.NewDefaultConsoleWriter(), logger.AllLevels)
+	l1.Info("hello world4")
+
+	// time.Sleep(time.Second * 3)
+
+	return
+	l1.Info("hello world5")
 	//init service
 	log.Info("WMQ Service Started")
 	initConsumerManager()

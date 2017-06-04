@@ -31,6 +31,6 @@ prefix = "wmq."
 [log]
 #which level log to file,default:["info","error","debug"]
 level = ["info","error","debug"]
-dir = log
+dir = "log"
 
 
