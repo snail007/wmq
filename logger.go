@@ -19,6 +19,8 @@ func initLog() {
 		level = logger.WarnLevel | logger.ErrorLevel | logger.FatalLevel
 	case "error":
 		level = logger.ErrorLevel | logger.FatalLevel
+	case "fatal":
+		level = logger.FatalLevel
 	default:
 		level = 0
 	}
