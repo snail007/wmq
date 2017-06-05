@@ -240,7 +240,7 @@ note:default manage port is 3302
                             }]
                  or {code:0,data:"some error"} 
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
-10.get all consumer status of a message
+10.get a consumer status
     request:
             protocol:http
             method:get
@@ -267,11 +267,11 @@ note:default manage port is 3302
                             }
                  or {code:0,data:"some error"} 
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
-11.get a consumer status
+11.get all consumer status of a message
     request:
             protocol:http
             method:get
-            path:/consumer/status
+            path:/message/status
             parameters:
                 Name:string         //message name
                 ID:string           //consumer's ID

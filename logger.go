@@ -1,75 +1,30 @@
 package main
 
 import (
-	"time"
-
-	"os"
-
-	"strings"
-
-	"github.com/Sirupsen/logrus"
-	"github.com/lestrrat/go-file-rotatelogs"
-	"github.com/rifflock/lfshook"
+	"github.com/snail007/mini-logger"
 )
+
+var log logger.MiniLogger
 
 //initLog
 func initLog() {
-	//log.Formatter = new(logrus.JSONFormatter)
+	var level byte
 	switch cfg.GetString("log.console-level") {
+	case "debug":
+		level = logger.AllLevels
 	case "info":
-		log.Level = logrus.InfoLevel
+		level = logger.InfoLevel | logger.WarnLevel | logger.ErrorLevel | logger.FatalLevel
 	case "warn":
-		log.Level = logrus.WarnLevel
+		level = logger.WarnLevel | logger.ErrorLevel | logger.FatalLevel
 	case "error":
-		log.Level = logrus.ErrorLevel
+		level = logger.ErrorLevel | logger.FatalLevel
+	case "fatal":
+		level = logger.FatalLevel
 	default:
-		log.Level = logrus.DebugLevel
+		level = 0
 	}
-
-	// callerLevels := logrus.AllLevels
-	// stackLevels := []logrus.Level{logrus.PanicLevel, logrus.FatalLevel, logrus.WarnLevel, logrus.ErrorLevel}
-	// logrus.AddHook(logrus_stack.NewHook(callerLevels, stackLevels))
-	var path = strings.TrimRight(cfg.GetString("log.dir"), "/\\")
-	var levels = cfg.GetStringSlice("log.level")
-	if len(levels) > 0 {
-		if !pathExists(path) {
-			os.Mkdir(path, 0700)
-		}
-		debugWriter, _ := rotatelogs.New(
-			path+"/debug.%Y%m%d.log",
-			rotatelogs.WithLinkName(path+"/debug.log"),
-			rotatelogs.WithMaxAge(time.Hour*24*7),
-			rotatelogs.WithRotationTime(time.Hour*24),
-		)
-		infoWriter, _ := rotatelogs.New(
-			path+"/info.%Y%m%d.log",
-			rotatelogs.WithLinkName(path+"/info.log"),
-			rotatelogs.WithMaxAge(time.Hour*24*7),
-			rotatelogs.WithRotationTime(time.Hour*24),
-		)
-		errorWriter, _ := rotatelogs.New(
-			path+"log/error.%Y%m%d.log",
-			rotatelogs.WithLinkName(path+"/error.log"),
-			rotatelogs.WithMaxAge(time.Hour*24*7),
-			rotatelogs.WithRotationTime(time.Hour),
-		)
-		if ok, _ := inArray("debug", levels); ok {
-			log.Hooks.Add(lfshook.NewHook(lfshook.WriterMap{
-				logrus.DebugLevel: debugWriter,
-			}))
-		}
-		if ok, _ := inArray("info", levels); ok {
-			log.Hooks.Add(lfshook.NewHook(lfshook.WriterMap{
-				logrus.InfoLevel: infoWriter,
-			}))
-		}
-		if ok, _ := inArray("error", levels); ok {
-			log.Hooks.Add(lfshook.NewHook(lfshook.WriterMap{
-				logrus.ErrorLevel: errorWriter,
-				logrus.WarnLevel:  errorWriter,
-			}))
-		}
-
-	}
-
+	log = logger.New(false, nil)
+	log.AddWriter(&logger.ConsoleWriter{
+		Format: "[{level}] [{date} {time}.{mili}] {text} {fields}",
+	}, level)
 }

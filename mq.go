@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	logger "github.com/snail007/mini-logger"
 	"github.com/streadway/amqp"
 )
 
@@ -26,7 +27,7 @@ func getMqConnection() (conn *amqp.Connection, err error) {
 		conn = c.(*amqp.Connection)
 		return
 	}
-	log.Errorf("fail pools.Get():%s", err)
+	log.With(logger.Fields{"func": "getMqConnection", "call": "pools.Get"}).Errorf("fail,%s", err)
 	return
 }
 func getMqChannel() (channel *amqp.Channel, err error) {
@@ -36,7 +37,7 @@ func getMqChannel() (channel *amqp.Channel, err error) {
 		channel = c.(*amqp.Channel)
 		return
 	}
-	log.Errorf("channelPools.Get() fail in exists channelPools:%s", err)
+	log.With(logger.Fields{"func": "getMqChannel", "call": "channelPools.Get"}).Errorf("fail,%s", err)
 	return
 }
 func getQueueName(queueName string) string {
@@ -47,6 +48,8 @@ func getExchangeName(exchangeName string) string {
 }
 func queueDeclare(name string, durable bool) (queue amqp.Queue, channel *amqp.Channel, err error) {
 	name = getQueueName(name)
+	ctx := ctxFunc("queueDeclare").With(logger.Fields{"queue": name})
+
 	autoDelete, exclusive, noWait := true, false, false
 	if durable {
 		autoDelete = false
@@ -62,33 +65,36 @@ RETRY:
 		queue, err = channel.QueueDeclare(name, durable, autoDelete, exclusive, noWait, nil)
 		channelPools.Put(channel)
 		if err == nil {
-			log.Debug("[" + name + "] queueDeclare success")
+			ctx.Debug("declare success")
 			return
 		}
 		channel, err = getMqChannel()
+		ctx1 := ctx.With(logger.Fields{"subCall": "channel.getMqChannel"})
 		if err == nil {
 			_, err = channel.QueueDelete(name, false, false, false)
 			channelPools.Put(channel)
+			ctx2 := ctx.With(logger.Fields{"subSubCall": "channel.QueueDelete"})
 			if err != nil {
-				log.Errorf("channel.QueueDelete("+name+", false, false, false):%s", err)
+				ctx2.Errorf("fail,%s", err)
 			} else {
-				log.Debug("[" + name + "] QueueDelete success")
+				ctx2.Debug("delete success")
 			}
 			retryCount++
 			goto RETRY
 		} else {
 			channelPools.Put(channel)
-			log.Errorf("getMqChannel [for QueueDelete]:%s", err)
+			ctx1.Errorf("fail,%s", err)
 		}
 	} else {
 		channelPools.Put(channel)
-		log.Errorf("getMqChannel [for QueueDeclare]:%s", err)
+		ctx.With(logger.Fields{"call": "channel.getMqChannel"}).Errorf("declare fail,%s", err)
 	}
 	return
 }
 
 func exchangeDeclare(name, kind string, durable bool) (channel *amqp.Channel, err error) {
 	name = getExchangeName(name)
+	ctx := ctxFunc("exchangeDeclare").With(logger.Fields{"exchange": name})
 	autoDelete, internal, noWait := true, false, false
 	if durable {
 		autoDelete = false
@@ -100,31 +106,35 @@ RETRY:
 		return
 	}
 	channel, err = getMqChannel()
+	ctx1 := ctx.With(logger.Fields{"call": "getMqChannel"})
 	if err == nil {
 		err = channel.ExchangeDeclare(name, kind, durable, autoDelete, internal, noWait, nil)
+		ctx2 := ctx1.With(logger.Fields{"subCall": "channel.ExchangeDeclare"})
 		channelPools.Put(channel)
 		if err == nil {
-			log.Debug("[" + name + "] ExchangeDeclare success")
+			ctx2.Debug("declare success")
 			return
 		}
 		channel, err = getMqChannel()
+		ctx2 = ctx1.With(logger.Fields{"subCall": "getMqChannel"})
 		if err == nil {
 			err = channel.ExchangeDelete(name, false, false)
+			ctx3 := ctx1.With(logger.Fields{"subSubCall": "channel.ExchangeDelete"})
 			channelPools.Put(channel)
 			if err != nil {
-				log.Errorf("channel.ExchangeDelete("+name+", false, false):%s", err)
+				ctx3.Errorf("fail,%s", err)
 			} else {
-				log.Debug("[" + name + "] ExchangeDelete success")
+				ctx3.Debug("success")
 			}
 			retryCount++
 			goto RETRY
 		} else {
 			channelPools.Put(channel)
-			log.Errorf("getMqChannel [for ExchangeDelete]:%s", err)
+			ctx2.Errorf("fail,%s", err)
 		}
 	} else {
 		channelPools.Put(channel)
-		log.Errorf("getMqChannel [for ExchangeDeclare]:%s", err)
+		ctx1.Errorf("fail,%s", err)
 	}
 	return
 }
@@ -132,57 +142,63 @@ RETRY:
 func queueBindToExchange(queuename, exchangeName, routeKey string) (err error) {
 	queuename = getQueueName(queuename)
 	exchangeName = getExchangeName(exchangeName)
+	ctx := ctxFunc("queueBindToExchange").With(logger.Fields{"queue": queuename, "exchange": exchangeName})
 	var channel *amqp.Channel
 	channel, err = getMqChannel()
 	defer func() { channelPools.Put(channel) }()
 	if err == nil {
 		err = channel.QueueBind(queuename, routeKey, exchangeName, false, nil)
 		if err == nil {
-			log.Debugf("queueBindToExchange [ %s->%s ] success", queuename, exchangeName)
+			ctx.Debugf("success", queuename, exchangeName)
 			return
 		}
 	}
-	log.Errorf("queueBindToExchange [ %s->%s ] fail", queuename, exchangeName)
+	ctx.Errorf("fail,%s", err)
 	return
 }
 
 func deleteQueue(queueName string) (err error) {
 	queueName = getQueueName(queueName)
+	ctx := ctxFunc("deleteQueue").With(logger.Fields{"queue": queueName})
 	var channel *amqp.Channel
 	defer func() { channelPools.Put(channel) }()
 	channel, err = getMqChannel()
 	if err == nil {
 		_, err = channel.QueueDelete(queueName, false, false, false)
+		ctx1 := ctx.With(logger.Fields{"call": "channel.QueueDelete"})
 		if err != nil {
-			log.Errorf("deleteQueue->channel.QueueDelete("+queueName+", false, false, false):%s", err)
+			ctx1.Errorf("fail,%s", err)
 		} else {
-			log.Debug("[" + queueName + "] deleteQueue->QueueDelete success")
+			ctx1.Debug("success")
 		}
 	} else {
-		log.Errorf("deleteQueue->getMqChannel:%s", err)
+		ctx.Errorf("fail,%s", err)
 	}
 	return
 }
 func deleteExchange(exchangeName string) (err error) {
 	exchangeName = getExchangeName(exchangeName)
+	ctx := ctxFunc("deleteExchange").With(logger.Fields{"exchange": exchangeName})
 	var channel *amqp.Channel
 	channel, err = getMqChannel()
 	defer func() { channelPools.Put(channel) }()
 	if err == nil {
 		err = channel.ExchangeDelete(exchangeName, false, false)
+		ctx1 := ctx.With(logger.Fields{"call": "channel.ExchangeDelete"})
 		if err != nil {
-			log.Errorf("channel.ExchangeDelete("+exchangeName+", false, false):%s", err)
+			ctx1.Errorf("fail,%s", err)
 		} else {
-			log.Debug("[" + exchangeName + "] ExchangeDelete success")
+			ctx1.Debug("success")
 			return
 		}
 	} else {
-		log.Errorf("deleteQueue->getMqChannel:%s", err)
+		ctx.Errorf("fail,%s", err)
 	}
 	return
 }
 
 func initPool() (err error) {
+	ctx := ctxFunc("initPool")
 	poolcfg := poolConfig{
 		InitialCap: poolInitialCap,
 		MaxCap:     poolMaxCap,
@@ -207,10 +223,10 @@ func initPool() (err error) {
 				},
 			})
 			if err == nil {
-				log.Debugf("Connect to RabbitMQ SUCCESS")
+				ctx.Debugf("Connect to RabbitMQ SUCCESS")
 				return
 			}
-			log.Debugf("Connect to RabbitMQ FAIL")
+			ctx.Debugf("Connect to RabbitMQ FAIL")
 			return
 		},
 		IsActive: func(conn interface{}) (ok bool) {
@@ -231,6 +247,7 @@ func initPool() (err error) {
 	return
 }
 func initChannelPool() (err error) {
+	ctx := ctxFunc("initChannelPool")
 	poolcfg := poolConfig{
 		InitialCap: poolChannelInitialCap,
 		MaxCap:     poolChannelMaxCap,
@@ -247,11 +264,11 @@ func initChannelPool() (err error) {
 			if err == nil {
 				retConn, err = conn.(*amqp.Connection).Channel()
 				if err == nil {
-					log.Debugf("Channel Create  SUCCESS")
+					ctx.Debugf("Channel Create  SUCCESS")
 					return
 				}
 			}
-			log.Debugf("Channel Create FAIL")
+			ctx.Debugf("Channel Create FAIL")
 			return
 		},
 		IsActive: func(conn interface{}) (ok bool) {
