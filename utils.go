@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+
+	logger "github.com/snail007/mini-logger"
 )
 
 //fileGetContents
@@ -52,4 +54,8 @@ func pathExists(_path string) bool {
 		return false
 	}
 	return true
+}
+
+func ctxFunc(fname string) logger.MiniLogger {
+	return log.With(logger.Fields{"func": fname})
 }

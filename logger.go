@@ -8,7 +8,6 @@ var log logger.MiniLogger
 
 //initLog
 func initLog() {
-	//log.Formatter = new(logrus.JSONFormatter)
 	var level byte
 	switch cfg.GetString("log.console-level") {
 	case "debug":
@@ -24,6 +23,8 @@ func initLog() {
 	default:
 		level = 0
 	}
-	log = logger.New(false)
-	log.AddWriter(logger.NewDefaultConsoleWriter(), level)
+	log = logger.New(false, nil)
+	log.AddWriter(&logger.ConsoleWriter{
+		Format: "[{level}] [{date} {time}.{mili}] {text} {fields}",
+	}, level)
 }

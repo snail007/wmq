@@ -3,6 +3,8 @@ package main
 import (
 	"time"
 
+	logger "github.com/snail007/mini-logger"
+
 	"fmt"
 	"os"
 )
@@ -27,19 +29,27 @@ func panicHandler(output string) {
 	fmt.Println("called" + output)
 }
 func main() {
+	ctx := log.With(logger.Fields{"func": "main"})
 	// defer func() {
 	// 	logger.Flush()
 	// }()
-	// l1 := logger.New(false)
+	// l1 := logger.New(false, nil)
 	// l1.AddWriter(logger.NewDefaultConsoleWriter(), logger.AllLevels)
 	// l1.Info("hello world4")
+	// ctx := l1.With(logger.Fields{"user": "test"})
+	// ctx.Info("hello world")
+	// subctx := ctx.With(logger.Fields{"queue": "haha"})
+	// subctx.Info("show")
 
+	// l1.Info("aaa")
+	// subctx.Info("bbb")
+	// ctx.Info("ccc")
 	// // time.Sleep(time.Second * 3)
 
 	// return
 	// l1.Info("hello world5")
 	//init service
-	log.Info("WMQ Service Started")
+	ctx.Info("WMQ Service Started")
 	initConsumerManager()
 
 	initMessages()
@@ -65,7 +75,7 @@ func init() {
 	}
 
 	initLog()
-
+	ctx := log.With(logger.Fields{"func": "init"})
 	uri = fmt.Sprintf("amqp://%s:%s@%s:%d%s",
 		cfg.GetString("rabbitmq.username"),
 		cfg.GetString("rabbitmq.password"),
@@ -75,14 +85,14 @@ func init() {
 	messageDataFilePath = cfg.GetString("consume.DataFile")
 	messages, err = loadMessagesFromFile(messageDataFilePath)
 	if err != nil {
-		log.Fatalf("load message data form file fail [%s],%s", messageDataFilePath, err)
+		ctx.Fatalf("load message data form file fail [%s],%s", messageDataFilePath, err)
 	}
 	if err = initPool(); err != nil {
-		log.Fatalf("init connection to rabbitmq fail : %s", err)
+		ctx.Fatalf("init connection to rabbitmq fail : %s", err)
 
 	}
 	if err = initChannelPool(); err != nil {
-		log.Fatalf("init Channel Pool fail : %s", err)
+		ctx.Fatalf("init Channel Pool fail : %s", err)
 	}
 
 }

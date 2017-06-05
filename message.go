@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/Jeffail/gabs"
+	logger "github.com/snail007/mini-logger"
 	"github.com/streadway/amqp"
 	"gopkg.in/resty.v0"
 )
@@ -162,14 +164,16 @@ func statusConsumer(messageName, consumerID string) (json *gabs.Container, err e
 	return
 }
 func addMessage(m message) (err error) {
+	ctx := ctxFunc("addMessage")
 	msgLock.Lock()
 	defer msgLock.Unlock()
 	messages = append(messages, m)
-	log.Infof("message [ %s ] was added", m.Name)
+	ctx.With(logger.Fields{"message": m.Name}).Infof("was added")
 	initMessages()
 	return nil
 }
 func updateMessage(m message) (err error) {
+	ctx := ctxFunc("updateMessage")
 	msgLock.Lock()
 	defer msgLock.Unlock()
 	_, i, e := getMessage(m.Name)
@@ -183,15 +187,16 @@ func updateMessage(m message) (err error) {
 		_, e := stopConsumerWorker(c, m)
 		if e != nil {
 			err = e
-			log.Infof("message [ %s ] was updated fail , %s", m.Name, e)
+			ctx.With(logger.Fields{"message": m.Name, "consumer": c.ID, "call": "stopConsumerWorker"}).Infof("fail , %s", e)
 			return
 		}
 	}
-	log.Infof("message [ %s ] was updated", m.Name)
+	ctx.Infof("updated")
 	initMessages()
 	return
 }
 func deleteMessage(m message) (err error) {
+	ctx := ctxFunc("deleteMessage").With(logger.Fields{"message": m.Name})
 	msgLock.Lock()
 	defer msgLock.Unlock()
 	msg, i, e := getMessage(m.Name)
@@ -204,23 +209,24 @@ func deleteMessage(m message) (err error) {
 		_, e := stopConsumerWorker(c, m)
 		if e != nil {
 			err = e
-			log.Infof("message [ %s ] was delete fail [stopConsumerWorker] , %s", m.Name, e)
+			ctx.With(logger.Fields{"call": "stopConsumerWorker"}).Infof("delete fail ,%s", e)
 			return
 		}
 		er := deleteQueue(getConsumerKey(*msg, c))
 		if er != nil {
 			err = er
-			log.Infof("message [ %s ] was delete fail [deleteQueue] , %s", m.Name, e)
+			ctx.With(logger.Fields{"call": "deleteQueue"}).Infof("delete fail, %s", e)
 			return
 		}
 	}
 	//update messsages data
 	messages = append(messages[:i], messages[i+1:]...)
-	log.Infof("message [ %s ] was deleted", m.Name)
+	ctx.Infof("deleted")
 	initMessages()
 	return
 }
 func addConsumer(msg message, c0 consumer) (err error) {
+	ctx := ctxFunc("addConsumer")
 	msgLock.Lock()
 	defer msgLock.Unlock()
 	//add it to messages
@@ -233,7 +239,7 @@ func addConsumer(msg message, c0 consumer) (err error) {
 	messages[i].Consumers = append(messages[i].Consumers, c0)
 	//update worker
 	initMessages()
-	log.Infof("consumer [ %s ] was added", getConsumerKey(msg, c0))
+	ctx.With(logger.Fields{"consumer": getConsumerKey(msg, c0)}).Infof("added")
 	return
 }
 
@@ -253,6 +259,7 @@ func updateConsumer(msg message, c0 consumer) (err error) {
 }
 
 func deleteConsumer(msg message, c0 consumer) (err error) {
+	ctx := ctxFunc("deleteConsumer")
 	msgLock.Lock()
 	defer msgLock.Unlock()
 	_, i0, i, _ := getConsumer(msg.Name, c0.ID)
@@ -262,11 +269,12 @@ func deleteConsumer(msg message, c0 consumer) (err error) {
 	_, err = stopConsumerWorker(c0, msg)
 	//update messages worker
 	initMessages()
-	log.Infof("consumer [ %s ] was deleted", getConsumerKey(msg, c0))
+	ctx.With(logger.Fields{"consumer": getConsumerKey(msg, c0)}).Infof("deleted")
 	return
 }
 
 func publish(body, exchangeName, routeKey, token string) (err error) {
+	ctx := ctxFunc("publish")
 	var msg *message
 	msg, _, err = getMessage(exchangeName)
 	if err != nil {
@@ -283,13 +291,14 @@ func publish(body, exchangeName, routeKey, token string) (err error) {
 			Body: []byte(body),
 		})
 		channelPools.Put(channel)
+		ctx1 := ctx.With(logger.Fields{"call": "channel.Publish", "exchange": getExchangeName(exchangeName)})
 		if err == nil {
-			log.Debugf("publish message success , exchange:%s", exchangeName)
+			ctx1.Debugf("success")
 			return
 		}
-		log.Warnf("publish message fail , exchange:%s,%s", exchangeName, err)
+		ctx1.Warnf("publish fail,%s", err)
 	} else {
-		log.Warnf("publish message ->getMqChannel , exchange:%s,%s", exchangeName, err)
+		ctx.With(logger.Fields{"call": "getMqChannel"}).Warnf("fail,%s", err)
 	}
 	return
 }
@@ -327,44 +336,49 @@ func notifyConsumerManager(action string, c consumer, m message) (answer string,
 		err = fmt.Errorf("action must be [update|delete]")
 		return
 	}
-	log.Debugf("sending %s to %s , waiting answer ...", action, m.Name+"_"+c.ID)
+	ctx := ctxFunc("notifyConsumerManager").With(logger.Fields{"action": action, "message": "m.Name", "consumer": c.ID})
+	ctx.Debugf("sending...")
 	consumerManageReadChan <- wrapedConsumer{
 		action:   action,
 		consumer: c,
 		message:  m,
 	}
-	log.Debugf("send %s to %s okay , response to manage ...", action, m.Name+"_"+c.ID)
+	ctx.Debugf("response to consumer manager...")
 	answer = <-consumerManageWriteChan
-	log.Debugf("manage answer : %s", answer)
+	ctx.Debugf("consumer manager answer : %s", answer)
 	return
 }
 func getConsumerKey(m message, c consumer) string {
 	return m.Name + "-" + c.ID
 }
 func initMessages() {
+	ctx := ctxFunc("initMessages")
 	for _, m := range messages {
 		_, err := exchangeDeclare(m.Name, m.Mode, m.Durable)
+		ctx1 := ctx.With(logger.Fields{"exchange": m.Name})
 		if err == nil {
 			for _, c := range m.Consumers {
 				_, _, err := queueDeclare(getConsumerKey(m, c), m.Durable)
+				ctx2 := ctx1.With(logger.Fields{"queue": getConsumerKey(m, c)})
 				if err == nil {
 					err := queueBindToExchange(getConsumerKey(m, c), m.Name, c.RouteKey)
 					if err == nil {
 						answer, err := updateConsumerWorker(c, m)
+						ctx3 := ctx2.With(logger.Fields{"call": "updateConsumerWorker"})
 						if err == nil {
-							log.Debugf("updateConsumer answer %s ", answer)
+							ctx3.Debugf("answer %s ", answer)
 						} else {
-							log.Warnf("updateConsumer %s ", err)
+							ctx3.Warnf("%s ", err)
 						}
 					} else {
-						log.Warnf("queueBindToExchange %s ", err)
+						ctx2.Warnf("bind fail , %s ", err)
 					}
 				} else {
-					log.Warnf("queueDeclare %s ", err)
+					ctx2.Warnf("declare fail , %s ", err)
 				}
 			}
 		} else {
-			log.Warnf("exchangeDeclare %s ", err)
+			ctx1.Warnf("declare fail , %s ", err)
 		}
 	}
 }
@@ -395,15 +409,15 @@ func stopAllConsumer() (err error) {
 	return
 }
 func initConsumerManager() {
+	ctx := ctxFunc("initConsumerManager")
 	wrapedConsumers := make(map[string]*manageConsumer)
 	go func() {
-		log.Debugf("Consumer Manager started")
+		ctx.Debugf("started")
 		//Consumer Manager worker loop,waiting for control command and exec switch
 		for {
 			//waiting for control data
 			wrapedConsumer := <-consumerManageReadChan
 
-			log.Debugf("revecived consumer[%s]", wrapedConsumer.action)
 			//preprocess for control data
 			c := &manageConsumer{
 				wrapedConsumer:    wrapedConsumer,
@@ -411,6 +425,8 @@ func initConsumerManager() {
 				consumerWriteChan: make(chan string, 1),
 				key:               getConsumerKey(wrapedConsumer.message, wrapedConsumer.consumer),
 			}
+			ctx1 := ctx.With(logger.Fields{"wrapedConsumer": c.key})
+			ctx1.Debugf("revecived")
 			//decide what to do
 			switch wrapedConsumer.action {
 			case "update": //update or insert consumer
@@ -420,21 +436,21 @@ func initConsumerManager() {
 				} else {
 					c.lasttime = wrapedConsumers[c.key].lasttime
 				}
-				log.Debugf("%s consumer[%s]", t, c.key)
+				ctx1.Debugf("%s", t)
 				wrapedConsumers[c.key] = c
 				if t == "insert" {
 					//start consumer go
 					go func() {
 						defer func() {
 							delete(wrapedConsumers, c.key)
-							log.Warnf("consumer[%s] goroutine exited", c.key)
+							ctx1.Warnf("goroutine exited")
 						}()
 						//0.consumer worker start
 						for {
 						RETRY:
 							//1.check if exists in wrapedConsumers data
 							if _, ok := wrapedConsumers[c.key]; !ok {
-								log.Warnf("consumer[ %s ] not found , now exit", c.key)
+								ctx1.Warnf("not found , now exit")
 								runtime.Goexit()
 							}
 							//update consumer active time
@@ -443,7 +459,7 @@ func initConsumerManager() {
 							conn, err := pools.Get()
 							if err != nil {
 								pools.Put(conn)
-								log.Warnf("get conn fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
+								ctx1.With(logger.Fields{"call": "pools.Get"}).Warnf("fail,sleep 3 seconds ... %s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
@@ -451,7 +467,7 @@ func initConsumerManager() {
 							channel, err := conn.(*amqp.Connection).Channel()
 							if err != nil {
 								pools.Put(conn)
-								log.Warnf("get channel fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
+								ctx1.With(logger.Fields{"call": "pools.Put"}).Warnf("fail,sleep 3 seconds ... %s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
@@ -461,7 +477,7 @@ func initConsumerManager() {
 								wrapedConsumers[c.key].message.Durable)
 							if err != nil {
 								pools.Put(conn)
-								log.Warnf("exchangeDeclare() fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
+								ctx1.With(logger.Fields{"call": "exchangeDeclare"}).Warnf("fail, sleep 3 seconds ... %s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
@@ -470,7 +486,7 @@ func initConsumerManager() {
 								wrapedConsumers[c.key].message.Durable)
 							if err != nil {
 								pools.Put(conn)
-								log.Warnf("queueDeclare() fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
+								ctx1.With(logger.Fields{"call": "queueDeclare"}).Warnf("fail,", c.key, err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
@@ -480,7 +496,7 @@ func initConsumerManager() {
 								wrapedConsumers[c.key].consumer.RouteKey)
 							if err != nil {
 								pools.Put(conn)
-								log.Warnf("queueBindToExchange() fail for consumer %s , sleep 3 seconds ... %s", c.key, err)
+								ctx1.With(logger.Fields{"call": "queueBindToExchange"}).Warnf("fail,sleep 3 seconds ... %s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
@@ -488,7 +504,7 @@ func initConsumerManager() {
 							err = channel.Qos(1, 0, false)
 							if err != nil {
 								pools.Put(conn)
-								log.Warnf("set channel Qos fail for consumer , sleep 3 seconds ... %s", err)
+								ctx1.With(logger.Fields{"call": "channel.Qos"}).Warnf("fail,sleep 3 seconds ... %s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
@@ -496,15 +512,15 @@ func initConsumerManager() {
 							deliveryChn, err := channel.Consume(getQueueName(c.key), "", false, false, false, false, nil)
 							if err != nil {
 								pools.Put(conn)
-								log.Warnf("get deliveryChn fail for consumer , sleep 3 seconds ...%s", err)
+								ctx1.With(logger.Fields{"call": "channel.Consume"}).Warnf("fail, sleep 3 seconds ...%s", err)
 								time.Sleep(time.Second * 3)
 								continue
 							}
-							log.Infof("Consumer [ %s ] waiting for message ...", c.key)
+							ctx1.Infof("waiting for message ...")
 							//worker loop,use chan waiting for control command or delivery
 							for {
 								if _, ok := wrapedConsumers[c.key]; !ok {
-									log.Warnf("consumer[ %s ] not found , now exit", c.key)
+									ctx1.Warnf("not found , now exit")
 									runtime.Goexit()
 								}
 								//update consumer active time
@@ -519,10 +535,10 @@ func initConsumerManager() {
 								case delivery, ok := <-deliveryChn:
 									if !ok {
 										pools.Put(conn)
-										log.Warnf("get delivery fail for consumer")
+										ctx1.Warnf("read deliveryChn fail")
 										goto RETRY
 									}
-									log.Debugf("delivery revecived [ %s ] : %s", c.key, string(delivery.Body)[0:20]+"...")
+									ctx1.Debugf("delivery revecived: %s", c.key, string(delivery.Body)[0:20]+"...")
 									if process(string(delivery.Body), c.consumer) == nil {
 										//process success
 										err = delivery.Ack(false)
@@ -531,7 +547,7 @@ func initConsumerManager() {
 										err = delivery.Nack(false, true)
 									}
 									if err != nil {
-										log.Warnf("consumer %s ack/nack fail , %s", c.key, err)
+										ctx1.Warnf("ack or nack fail , %s", err)
 									}
 									time.Sleep(time.Second * 5)
 								}
@@ -542,9 +558,9 @@ func initConsumerManager() {
 				consumerManageWriteChan <- "completed"
 			case "delete": //stop consumer
 				if _, ok := wrapedConsumers[c.key]; ok {
-					log.Debugf("sending stop singal to consumer[%s] goroutine ...", c.key)
+					ctx1.Debugf("sending stop singal to goroutine ...")
 					wrapedConsumers[c.key].consumerReadChan <- "exit"
-					log.Debugf("send  stop singal to consumer[%s] goroutine success", c.key)
+					ctx1.Debugf("send  stop singal to goroutine success")
 				}
 				consumerManageWriteChan <- "completed"
 			case "status": //get consumer last active time
@@ -588,15 +604,17 @@ func loadMessagesFromFile(configFilePath0 string) (messages0 []message, err erro
 }
 
 func process(content string, c consumer) (err error) {
+	ctx := ctxFunc("process")
 	//content = "{\"body\":\"sss\",\"header\":{\"ID\":\"test\"},\"ip\":\"127.0.0.1\",\"method\":\"get\"}"
 	jsonParsed, err := gabs.ParseJSON([]byte(content))
+	ctx1 := ctx.With(logger.Fields{"call": "gabs.ParseJSON"})
 	if err != nil {
-		log.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content)
+		ctx1.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content[:20])
 		return nil
 	}
 	if !jsonParsed.Exists("body") || !jsonParsed.Exists("header") ||
 		!jsonParsed.Exists("ip") || !jsonParsed.Exists("method") || !jsonParsed.Exists("args") {
-		log.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content)
+		ctx1.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content[:20])
 		return nil
 	}
 
@@ -613,19 +631,17 @@ func process(content string, c consumer) (err error) {
 			url = c.URL + "?" + args
 		}
 	}
-	//log.Warnf("body:%s", body)
 	var headerMap = make(map[string]string)
 	for k, child := range header {
 		headerMap[k] = child.Data().(string)
-		log.Warnf("%s:%s", k, child.Data())
 	}
-	//log.Warnf("method:%s", method)
 	client := resty.New().
 		SetTimeout(time.Millisecond*time.Duration(c.Timeout)).R().
 		SetHeaders(headerMap).
 		SetHeader(cfg.GetString("publish.RealIpHeader"), ip).
 		SetHeader("User-Agent", "wmq v"+cfg.GetString("wmq.version")+" - https://github.com/snail007/wmq")
 	var resp *resty.Response
+	ctx2 := ctx.With(logger.Fields{"http": c.URL, "method": method})
 	if method == "post" {
 		resp, err = client.SetBody(body).Post(url)
 	} else if method == "get" {
@@ -634,19 +650,20 @@ func process(content string, c consumer) (err error) {
 		err = fmt.Errorf("method [ %s ] not supported", method)
 	}
 	if err != nil {
-		log.Warnf("consume fail [ %s ] %s", c.URL, err)
+		ctx2.Warnf("consume fail,%s", err)
 		return
 	}
 	if c.CheckCode {
 		code := resp.StatusCode()
+		ctx3 := ctx2.With(logger.Fields{"httpCode": strconv.Itoa(code)})
 		if float64(code) != c.Code {
-			err = fmt.Errorf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
-			log.Warnf("consume fail [ %s ] , response http code is %d , 200 expected ", c.URL, code)
+			err = fmt.Errorf("consume fail,httpCode 200 expected ")
+			ctx3.Warnf("%s", err)
 		} else {
-			log.Debugf("consume success , %s", c.URL)
+			ctx3.Debugf("consume success")
 		}
 	} else {
-		log.Debugf("consume success , %s", c.URL)
+		ctx2.Debugf("consume success")
 	}
 	return
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/Jeffail/gabs"
 	"github.com/buaazp/fasthttprouter"
 	"github.com/nu7hatch/gouuid"
+	logger "github.com/snail007/mini-logger"
 	"github.com/valyala/fasthttp"
 )
 
@@ -396,6 +397,7 @@ func response(ctx *fasthttp.RequestCtx, data interface{}, err error) {
 	}
 }
 func serveAPI(listen, token string) (err error) {
+	ctx := log.With(logger.Fields{"func": "serveAPI"})
 	apiToken = token
 	router := fasthttprouter.New()
 	router.GET("/message/add", timeoutFactory(apiMessageAdd))
@@ -409,19 +411,20 @@ func serveAPI(listen, token string) (err error) {
 	router.GET("/reload", timeoutFactory(apiReload))
 	router.GET("/restart", timeoutFactory(apiRestart))
 	router.GET("/config", timeoutFactory(apiConfig))
-	log.Infof("Api service started")
+	ctx.Infof("Api service started")
 	if fasthttp.ListenAndServe(listen, router.Handler) == nil {
-		log.Fatalf("start api fail:%s", err)
+		ctx.Fatalf("start api fail:%s", err)
 	}
 	return
 }
 func servePublish(listen string) (err error) {
+	ctx := log.With(logger.Fields{"func": "servePublish"})
 	router := fasthttprouter.New()
 	router.POST("/:name", timeoutFactory(apiPublish))
 	router.GET("/:name", timeoutFactory(apiPublish))
-	log.Infof("Publish service started")
+	ctx.Infof("Publish service started")
 	if fasthttp.ListenAndServe(listen, router.Handler) == nil {
-		log.Fatalf("start publish fail:%s", err)
+		ctx.Fatalf("start publish fail:%s", err)
 	}
 	return
 }
