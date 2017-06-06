@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"path/filepath"
 
 	"github.com/Jeffail/gabs"
 	"github.com/buaazp/fasthttprouter"
@@ -360,6 +364,28 @@ func apiConfig(ctx *fasthttp.RequestCtx) {
 	j, e := config()
 	response(ctx, j, e)
 }
+func apiLog(ctx *fasthttp.RequestCtx) {
+	if !checkRequest(ctx) {
+		tokenError(ctx)
+		return
+	}
+	keyword := string(ctx.QueryArgs().Peek("keyword"))
+	logType := string(ctx.QueryArgs().Peek("type"))
+	if keyword == "" || logType == "" {
+		response(ctx, "", errors.New("args required"))
+		return
+	}
+	file, _ := filepath.Abs(filepath.Join(cfg.GetString("log.dir"), logType) + ".log")
+	commandStr := fmt.Sprintf("grep \"%s\" %s |tail -n 100", keyword, file)
+	cmd := exec.Command("bash", "-c", commandStr)
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	err := cmd.Run()
+	response(ctx, string(stdout.Bytes()), err)
+
+}
 func tokenError(ctx *fasthttp.RequestCtx) {
 	ctx.Response.SetBodyString("{code:0,data:\"token error\"")
 }
@@ -411,6 +437,7 @@ func serveAPI(listen, token string) (err error) {
 	router.GET("/reload", timeoutFactory(apiReload))
 	router.GET("/restart", timeoutFactory(apiRestart))
 	router.GET("/config", timeoutFactory(apiConfig))
+	router.GET("/log", timeoutFactory(apiLog))
 	ctx.Infof("Api service started")
 	if fasthttp.ListenAndServe(listen, router.Handler) == nil {
 		ctx.Fatalf("start api fail:%s", err)
