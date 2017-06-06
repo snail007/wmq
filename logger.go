@@ -29,5 +29,6 @@ func initLog() {
 	log.AddWriter(console.NewDefault(), level)
 	cfgF := files.GetDefaultFileConfig()
 	cfgF.LogPath = cfg.GetString("log.dir")
+	cfgF.FileNameSet["debug"] = logger.AllLevels
 	log.AddWriter(files.New(cfgF), logger.AllLevels)
 }

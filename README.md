@@ -303,4 +303,54 @@ note:default manage port is 3302
                             }
                  or {code:0,data:"some error"} 
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
+12.get or search last 100 lines log content
+    request:
+            protocol:http
+            method:get
+            path:/log
+            parameters:
+                keyword:string           //keyword to search
+                type:string             //should be one of: info,error,debug
+                api-token:string        //the api token is setting in config
+                callback:string         //callback function name for jsonp call,
+                                            if no jsonp call ,leave it empty
+    response:
+            type:json
+            column:
+                code:1|0    //1 means success , 0 means fail
+            example:
+                no jsonp:
+                            {
+                                "code": 1, 
+                                "data":"log content"
+                            }
+                 or {code:0,data:"some error"} 
+                jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
+13.get all log file names
+    request:
+            protocol:http
+            method:get
+            path:/log/list
+            parameters:
+                api-token:string        //the api token is setting in config
+                callback:string         //callback function name for jsonp call,
+                                            if no jsonp call ,leave it empty
+    response:
+            type:json
+            column:
+                code:1|0    //1 means success , 0 means fail
+            example:
+                no jsonp:{"code":1,"data":["error.log","info.log"]}
+                 or {code:0,data:"some error"} 
+                jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
+14.download a log file
+    request:
+            protocol:http
+            method:get
+            path:/log/file
+            parameters:
+                file:string             //filename of log file
+                api-token:string        //the api token is setting in config
+    response:
+            your browser will tip download file
 </pre>
