@@ -149,7 +149,7 @@ func queueBindToExchange(queuename, exchangeName, routeKey string) (err error) {
 	if err == nil {
 		err = channel.QueueBind(queuename, routeKey, exchangeName, false, nil)
 		if err == nil {
-			ctx.Debugf("success", queuename, exchangeName)
+			ctx.Debugf("success")
 			return
 		}
 	}

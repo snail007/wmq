@@ -2,13 +2,15 @@ package main
 
 import (
 	"github.com/snail007/mini-logger"
+	"github.com/snail007/mini-logger/writers/console"
+	"github.com/snail007/mini-logger/writers/files"
 )
 
 var log logger.MiniLogger
 
 //initLog
 func initLog() {
-	var level byte
+	var level uint8
 	switch cfg.GetString("log.console-level") {
 	case "debug":
 		level = logger.AllLevels
@@ -24,7 +26,6 @@ func initLog() {
 		level = 0
 	}
 	log = logger.New(false, nil)
-	log.AddWriter(&logger.ConsoleWriter{
-		Format: "[{level}] [{date} {time}.{mili}] {text} {fields}",
-	}, level)
+	log.AddWriter(console.NewDefault(), level)
+	log.AddWriter(files.NewDefault(), logger.AllLevels)
 }
