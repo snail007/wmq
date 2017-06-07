@@ -7,15 +7,18 @@ Usage of wmq:
 --api-token string             access api token (default "guest")
 --data-example                 print example of data-file
 --data-file string             which file will store messages (default "message.json")
---fail-wait int                access consumer url  fail and then how many milliseconds to sleep (default 50000)
---ignore-headers stringSlice   these http headers will be ignored when access to consumer's url , 
-                                multiple splitted by comma(,)
---level string                 console log level,should be one of debug,info,warn,error (default "debug")
+--fail-wait int                access consumer url  fail and then how many milliseconds 
+                               to sleep (default 50000)
+--ignore-headers stringSlice   these http headers will be ignored when access to consumer's url,
+                               multiple splitted by comma(,)
+--level string                 console log level,should be one of debug,info,warn,error 
+                               (default "debug")
 --listen-api string            api service listening port (default "0.0.0.0:3302")
 --listen-publish string        publish service listening port (default "0.0.0.0:3303")
 --log-access                   access log on or off (default true)
 --log-dir string               the directory which store log files (default "log")
---log-level stringSlice        log to file level,multiple splitted by comma(,) (default [info,error,debug])
+--log-level stringSlice        log to file level,multiple splitted by comma(,) 
+                               (default [info,error,debug])
 --log-max-count int            log file max count for rotate to remain (default 3)
 --log-max-size int             log file max size(bytes) for rotate (default 102400000)
 --mq-host string               which host be used when connect to RabbitMQ (default "127.0.0.1")
