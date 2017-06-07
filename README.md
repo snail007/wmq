@@ -3,22 +3,22 @@ wrapped  message queue which based on rabbitmq,support http protocol
 # Usage:
 <pre>
 Usage of wmq:
-      --listen-publish string        publish service listening port (default "0.0.0.0:3303")
-      --log-access                   access log on or off (default true)
-      --log-dir string               the directory which store log files (default "log")
-      --log-level stringSlice        log to file level,multiple splitted by comma(,) 
-                                     (default [info,error,debug])
-      --log-max-count int            log file max count for rotate to remain (default 3)
-      --log-max-size int             log file max size(bytes) for rotate (default 102400000)
-      --mq-host string               which host be used when connect to RabbitMQ (default"127.0.0.1")
-      --mq-password string           which password be used when connect to RabbitMQ (default "guest")
-      --mq-port int                  which port be used when connect to RabbitMQ (default5672)
-      --mq-prefix string             the queue and exchange default prefix (default "wmq.")
-      --mq-username string           which username be used when connect to RabbitMQ (default "guest")
-      --mq-vhost string              which vhost be used when connect to RabbitMQ (default"/")
-      --realip-header string         the publisher's real ip will be set in this http header 
-                                     when access to consumer's url (default "X-Forwarded-For")
-      --version                      show version about current WMQ
+      --listen-publish string     publish service listening port (default "0.0.0.0:3303")
+      --log-access                access log on or off (default true)
+      --log-dir string            the directory which store log files (default "log")
+      --log-level stringSlice     log to file level,multiple splitted by comma(,) 
+                                  (default [info,error,debug])
+      --log-max-count int         log file max count for rotate to remain (default 3)
+      --log-max-size int          log file max size(bytes) for rotate (default 102400000)
+      --mq-host string            which host be used when connect to RabbitMQ (default"127.0.0.1")
+      --mq-password string        which password be used when connect to RabbitMQ (default "guest")
+      --mq-port int               which port be used when connect to RabbitMQ (default5672)
+      --mq-prefix string          the queue and exchange default prefix (default "wmq.")
+      --mq-username string        which username be used when connect to RabbitMQ (default "guest")
+      --mq-vhost string           which vhost be used when connect to RabbitMQ (default"/")
+      --realip-header string      the publisher's real ip will be set in this http header 
+                                  when access to consumer's url (default "X-Forwarded-For")
+      --version                   show version about current WMQ
 </pre>
 
 # Publishing Message
