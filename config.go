@@ -37,6 +37,9 @@ func initConfig() (err error) {
 	pflag.String("mq-prefix", "wmq.", "the queue and exchange default prefix")
 	pflag.String("data-file", "message.json", "which file will store messages")
 	pflag.String("log-dir", "log", "the directory which store log files")
+	pflag.Bool("log-access", true, "access log on or off")
+	pflag.Int64("log-max-size", 102400000, "log file max size(bytes) for rotate")
+	pflag.Int("log-max-count", 3, "log file max count for rotate to remain")
 	pflag.StringSlice("log-level", []string{"info", "error", "debug"}, "log to file level,multiple splitted by comma(,)")
 	pflag.Parse()
 	if *version {
@@ -63,7 +66,10 @@ func initConfig() (err error) {
 	cfg.BindPFlag("rabbitmq.prefix", pflag.Lookup("mq-prefix"))
 	cfg.BindPFlag("log.dir", pflag.Lookup("log-dir"))
 	cfg.BindPFlag("log.level", pflag.Lookup("log-level"))
+	cfg.BindPFlag("log.access", pflag.Lookup("log-access"))
 	cfg.BindPFlag("log.console-level", pflag.Lookup("level"))
+	cfg.BindPFlag("log.fileMaxSize", pflag.Lookup("log-max-size"))
+	cfg.BindPFlag("log.maxCount", pflag.Lookup("log-max-count"))
 	cfg.SetDefault("default.IgnoreHeaders", []string{"Token", "RouteKey", "Host", "Accept-Encoding", " Content-Length", "Content-Type Connection"})
 
 	cfg.SetConfigName("config")

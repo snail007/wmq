@@ -464,6 +464,7 @@ func response(ctx *fasthttp.RequestCtx, data interface{}, err error) {
 		fmt.Fprintf(ctx, callbackFunc+"("+ja.String()+")")
 	}
 }
+
 func serveAPI(listen, token string) (err error) {
 	ctx := log.With(logger.Fields{"func": "serveAPI"})
 	apiToken = token
@@ -481,9 +482,13 @@ func serveAPI(listen, token string) (err error) {
 	router.GET("/config", timeoutFactory(apiConfig))
 	router.GET("/log", timeoutFactory(apiLog))
 	router.GET("/log/file", apiLogFile)
-	router.GET("/log/list", apiLogList)
+	router.GET("/log/list", timeoutFactory(apiLogList))
 	ctx.Infof("Api service started")
-	if fasthttp.ListenAndServe(listen, router.Handler) == nil {
+	var h = func(ctx *fasthttp.RequestCtx) {
+		defer access(ctx)
+		router.Handler(ctx)
+	}
+	if fasthttp.ListenAndServe(listen, h) == nil {
 		ctx.Fatalf("start api fail:%s", err)
 	}
 	return
@@ -494,8 +499,25 @@ func servePublish(listen string) (err error) {
 	router.POST("/:name", timeoutFactory(apiPublish))
 	router.GET("/:name", timeoutFactory(apiPublish))
 	ctx.Infof("Publish service started")
-	if fasthttp.ListenAndServe(listen, router.Handler) == nil {
+	var h = func(ctx *fasthttp.RequestCtx) {
+		defer access(ctx)
+		router.Handler(ctx)
+	}
+	if fasthttp.ListenAndServe(listen, h) == nil {
 		ctx.Fatalf("start publish fail:%s", err)
 	}
 	return
+}
+func access(ctx *fasthttp.RequestCtx) {
+	fields := logger.Fields{
+		"code":       strconv.Itoa(ctx.Response.StatusCode()),
+		"uri":        string(ctx.RequestURI()),
+		"remoteAddr": strings.Split(ctx.RemoteAddr().String(), ":")[0],
+		"method":     string(ctx.Method()),
+		"host":       string(ctx.Request.Host()),
+		"referer":    string(ctx.Request.Header.Referer()),
+		"userAgent":  string(ctx.Request.Header.UserAgent()),
+		"response":   string(ctx.Response.Body()),
+	}
+	accessLog.With(fields).Info("")
 }
