@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 
-	"strings"
-
 	"os"
 
 	"github.com/spf13/pflag"
@@ -22,6 +20,7 @@ func initConfig() (err error) {
 	pflag.String("listen-api", "0.0.0.0:3302", "api service listening port")
 	pflag.String("listen-publish", "0.0.0.0:3303", "publish service listening port")
 	pflag.String("api-token", "guest", "access api token")
+	configFile := pflag.String("config", "", "config file path")
 	pflag.Bool("api-disable", false, "disable api service")
 	pflag.String("level", "debug", "console log level,should be one of debug,info,warn,error")
 	version := pflag.Bool("version", false, "show version about current WMQ")
@@ -71,15 +70,19 @@ func initConfig() (err error) {
 	cfg.BindPFlag("log.fileMaxSize", pflag.Lookup("log-max-size"))
 	cfg.BindPFlag("log.maxCount", pflag.Lookup("log-max-count"))
 	cfg.SetDefault("default.IgnoreHeaders", []string{"Token", "RouteKey", "Host", "Accept-Encoding", " Content-Length", "Content-Type Connection"})
-
-	cfg.SetConfigName("config")
-	cfg.AddConfigPath("/etc/wmq/")
-	cfg.AddConfigPath("$HOME/.wmq")
-	cfg.AddConfigPath(".wmq")
-	cfg.AddConfigPath(".")
+	fmt.Printf("%s", *configFile)
+	if *configFile != "" {
+		cfg.SetConfigFile(*configFile)
+	} else {
+		cfg.SetConfigName("config")
+		cfg.AddConfigPath("/etc/wmq/")
+		cfg.AddConfigPath("$HOME/.wmq")
+		cfg.AddConfigPath(".wmq")
+		cfg.AddConfigPath(".")
+	}
 	err = cfg.ReadInConfig()
 
-	if err != nil && !strings.Contains(err.Error(), "Not") {
+	if err != nil && !os.IsNotExist(err) {
 		fmt.Printf("%s", err)
 	} else {
 		fmt.Printf("use config file : %s\n", cfg.ConfigFileUsed())
