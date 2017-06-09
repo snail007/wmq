@@ -52,7 +52,9 @@ func main() {
 	ctx.Info("WMQ Service Started")
 	initConsumerManager()
 
-	initMessages()
+	if err := initMessages(); err != nil {
+		ctx.With(logger.Fields{"call": "initMessages()"}).Fatalln("%s", err)
+	}
 
 	if !cfg.GetBool("api-disable") {
 		//init api service
