@@ -16,8 +16,8 @@ IgnoreHeaders = []
 RealIpHeader = "X-Forwarded-For"
 
 [consume]
-#access consumer url  fail and then how many milliseconds to sleep and retry
-FailWait = 50000
+#access consumer url  fail and then how many seconds to sleep and retry
+FailWait = 50
 #consumer's goroutine occur error and then how many seconds to sleep and retry
 GoFailWait = 3
 DataFile = "message.json"

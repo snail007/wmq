@@ -543,7 +543,7 @@ func initConsumerManager() {
 										ctx1.Warnf("read deliveryChn fail")
 										goto RETRY
 									}
-									ctx1.Debugf("delivery revecived: %s", c.key, string(delivery.Body)[0:20]+"...")
+									ctx1.Debugf("delivery revecived: %s,%s", c.key, string(delivery.Body)[0:20]+"...")
 									if process(string(delivery.Body), c.consumer) == nil {
 										//process success
 										err = delivery.Ack(false)

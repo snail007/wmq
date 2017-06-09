@@ -6,6 +6,7 @@ import (
 
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -112,4 +113,25 @@ func printExample() {
     "Name": "test",
     "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
 }]`)
+}
+func poster() string {
+	fg := color.New(color.FgHiYellow).SprintFunc()
+	return fg(`
+　★★★　　　★★　　　　★★　　★★★　　　　　　　　★★★　　　　　　★★★★★　　　　
+　★★★　　　★★　　　　★★　　★★★　　　　　　　　★★★　　　　　★★★★★★★★　　
+　★★★　　　★★　　　　★★　　★★★★　　　　　　★★★★　　　　★★　　　　　　★★　
+　★★★　　★★★★★　　★★　　★★★★　　　　　　★　★★　　　★★★　　　　　　★★　
+　　★★　　★★★★★　★★★　　★★　★★　　　　★★　★★　　　★★★　　　　　　　★　
+　　★★　　★★　★★　★★★　　★★　★★　　　　★　　★★　　　★★★　　　　　　　★　
+　　★★　　★★　★★　★★★　　★★　　★　　　★★　　★★　　　★★★　　　　　　　★　
+　　★★　★★★　★★　★★★　　★★　　★★　　★★　　★★　　　★★★　　　　　　　★　
+　　　★　★★★　★★　★★　　　★★　　　★　★★　　　★★　　　★★★　　　　　　　★　
+　　　★★★★　　　★★★★　　　★★　　　★★★★　　　★★　　　★★★　　　　　　★★　
+　　　★★★★　　　★★★★　　　★★　　　　★★　　　　★★　　　　★★★　　　　★★　　
+　　　★★★★　　　★★　　　　　★★　　　　★★　　　　★★　　　　　★★★★★★★　　　
+　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　★★★　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　★★　　　　
+Author: snail
+Link  : https://github.com/snail007/wmq
+`)
 }

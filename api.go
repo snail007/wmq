@@ -38,7 +38,7 @@ func apiMessageAdd(ctx *fasthttp.RequestCtx) {
 	IsNeedTokenS := string(ctx.QueryArgs().Peek("IsNeedToken"))
 	Mode := string(ctx.QueryArgs().Peek("Mode"))
 	Token := string(ctx.QueryArgs().Peek("Token"))
-	if Name == "" || DurableS == "" || IsNeedTokenS == "" || Token == "" {
+	if Name == "" || DurableS == "" || IsNeedTokenS == "" {
 		response(ctx, "", errors.New("args required"))
 		return
 	}
@@ -51,8 +51,12 @@ func apiMessageAdd(ctx *fasthttp.RequestCtx) {
 		Durable = true
 	}
 	IsNeedToken := false
-	if DurableS == "1" {
+	if IsNeedTokenS == "1" {
 		IsNeedToken = true
+	}
+	if IsNeedToken && Token == "" {
+		response(ctx, "", errors.New("message exists"))
+		return
 	}
 	if Mode != "fanout" && Mode != "topic" && Mode != "direct" {
 		response(ctx, "", errors.New("args required"))
@@ -97,7 +101,7 @@ func apiMessageUpdate(ctx *fasthttp.RequestCtx) {
 		Durable = true
 	}
 	IsNeedToken := false
-	if DurableS == "1" {
+	if IsNeedTokenS == "1" {
 		IsNeedToken = true
 	}
 	if Mode != "fanout" && Mode != "topic" && Mode != "direct" {

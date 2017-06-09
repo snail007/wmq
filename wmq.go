@@ -68,6 +68,7 @@ func main() {
 }
 
 func init() {
+	fmt.Println(poster())
 	var err error
 
 	err = initConfig()
@@ -77,6 +78,7 @@ func init() {
 	}
 
 	initLog()
+
 	ctx := log.With(logger.Fields{"func": "init"})
 	uri = fmt.Sprintf("amqp://%s:%s@%s:%d%s",
 		cfg.GetString("rabbitmq.username"),
