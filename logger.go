@@ -2,13 +2,16 @@ package main
 
 import (
 	"github.com/snail007/mini-logger"
+	"github.com/snail007/mini-logger/writers/console"
+	"github.com/snail007/mini-logger/writers/files"
 )
 
 var log logger.MiniLogger
+var accessLog logger.MiniLogger
 
 //initLog
 func initLog() {
-	var level byte
+	var level uint8
 	switch cfg.GetString("log.console-level") {
 	case "debug":
 		level = logger.AllLevels
@@ -24,7 +27,31 @@ func initLog() {
 		level = 0
 	}
 	log = logger.New(false, nil)
-	log.AddWriter(&logger.ConsoleWriter{
-		Format: "[{level}] [{date} {time}.{mili}] {text} {fields}",
-	}, level)
+	log.AddWriter(console.NewDefault(), level)
+	cfgF := files.GetDefaultFileConfig()
+	cfgF.LogPath = cfg.GetString("log.dir")
+	cfgF.MaxBytes = cfg.GetInt64("log.FileMaxSize")
+	cfgF.MaxCount = cfg.GetInt("log.MaxCount")
+	cfgLevels := cfg.GetStringSlice("log.level")
+	if ok, _ := inArray("debug", cfgLevels); ok {
+		cfgF.FileNameSet["debug"] = logger.AllLevels
+	}
+	if ok, _ := inArray("info", cfgLevels); ok {
+		cfgF.FileNameSet["info"] = logger.InfoLevel
+	}
+	if ok, _ := inArray("error", cfgLevels); ok {
+		cfgF.FileNameSet["error"] = logger.WarnLevel | logger.ErrorLevel | logger.FatalLevel
+	}
+	log.AddWriter(files.New(cfgF), logger.AllLevels)
+
+	accessLog = logger.New(false, nil)
+	//accessLog.AddWriter(console.NewDefault(), logger.AllLevels)
+	if cfg.GetBool("log.access") {
+		accessCfg := files.GetDefaultFileConfig()
+		accessCfg.LogPath = cfg.GetString("log.dir")
+		accessCfg.MaxBytes = cfg.GetInt64("log.FileMaxSize")
+		accessCfg.MaxCount = cfg.GetInt("log.MaxCount")
+		accessCfg.FileNameSet = map[string]uint8{"access": logger.InfoLevel}
+		accessLog.AddWriter(files.New(accessCfg), logger.InfoLevel)
+	}
 }

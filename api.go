@@ -1,13 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"path/filepath"
+
+	"os"
 
 	"github.com/Jeffail/gabs"
 	"github.com/buaazp/fasthttprouter"
@@ -32,7 +38,7 @@ func apiMessageAdd(ctx *fasthttp.RequestCtx) {
 	IsNeedTokenS := string(ctx.QueryArgs().Peek("IsNeedToken"))
 	Mode := string(ctx.QueryArgs().Peek("Mode"))
 	Token := string(ctx.QueryArgs().Peek("Token"))
-	if Name == "" || DurableS == "" || IsNeedTokenS == "" || Token == "" {
+	if Name == "" || DurableS == "" || IsNeedTokenS == "" {
 		response(ctx, "", errors.New("args required"))
 		return
 	}
@@ -45,8 +51,12 @@ func apiMessageAdd(ctx *fasthttp.RequestCtx) {
 		Durable = true
 	}
 	IsNeedToken := false
-	if DurableS == "1" {
+	if IsNeedTokenS == "1" {
 		IsNeedToken = true
+	}
+	if IsNeedToken && Token == "" {
+		response(ctx, "", errors.New("message exists"))
+		return
 	}
 	if Mode != "fanout" && Mode != "topic" && Mode != "direct" {
 		response(ctx, "", errors.New("args required"))
@@ -91,7 +101,7 @@ func apiMessageUpdate(ctx *fasthttp.RequestCtx) {
 		Durable = true
 	}
 	IsNeedToken := false
-	if DurableS == "1" {
+	if IsNeedTokenS == "1" {
 		IsNeedToken = true
 	}
 	if Mode != "fanout" && Mode != "topic" && Mode != "direct" {
@@ -360,8 +370,70 @@ func apiConfig(ctx *fasthttp.RequestCtx) {
 	j, e := config()
 	response(ctx, j, e)
 }
+func apiLogList(ctx *fasthttp.RequestCtx) {
+	if !checkRequest(ctx) {
+		tokenError(ctx)
+		return
+	}
+	f, _ := filepath.Abs(cfg.GetString("log.dir"))
+	fs, _ := filepath.Glob(f + "/*")
+	var list []string
+	for _, v := range fs {
+		list = append(list, filepath.Base(v))
+	}
+	response(ctx, list, nil)
+}
+func apiLogFile(ctx *fasthttp.RequestCtx) {
+	if !checkRequest(ctx) {
+		tokenError(ctx)
+		return
+	}
+	filename := string(ctx.QueryArgs().Peek("file"))
+	if filename == "" || strings.ContainsAny(filename, "/\\") {
+		response(ctx, "", errors.New("args required"))
+		return
+	}
+	f, _ := filepath.Abs(cfg.GetString("log.dir"))
+
+	file := filepath.Join(f, filename)
+	if _, e := os.Stat(file); os.IsNotExist(e) {
+		response(ctx, "", errors.New("file not found"))
+		return
+	}
+	ctx.Response.Header.Set("Content-Type", "application/force-download")
+	ctx.Response.Header.Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	ctx.Response.Header.Set("Content-Transfer-Encoding", "binary")
+	ctx.SendFile(file)
+}
+func apiLog(ctx *fasthttp.RequestCtx) {
+	if !checkRequest(ctx) {
+		tokenError(ctx)
+		return
+	}
+	keyword := string(ctx.QueryArgs().Peek("keyword"))
+	logType := string(ctx.QueryArgs().Peek("type"))
+	if logType == "" {
+		response(ctx, "", errors.New("args required"))
+		return
+	}
+	file, _ := filepath.Abs(filepath.Join(cfg.GetString("log.dir"), logType) + ".log")
+	commandStr := ""
+	if keyword == "" {
+		commandStr = fmt.Sprintf("tail -n 100 -f %s", file)
+	} else {
+		commandStr = fmt.Sprintf("grep \"%s\" %s |tail -n 100", keyword, file)
+	}
+	cmd := exec.Command("bash", "-c", commandStr)
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	err := cmd.Run()
+	response(ctx, string(stdout.Bytes()), err)
+
+}
 func tokenError(ctx *fasthttp.RequestCtx) {
-	ctx.Response.SetBodyString("{code:0,data:\"token error\"")
+	ctx.Response.SetBodyString("{code:0,data:\"token error\"}")
 }
 func checkRequest(ctx *fasthttp.RequestCtx) (ok bool) {
 	token := ctx.QueryArgs().Peek("api-token")
@@ -396,6 +468,7 @@ func response(ctx *fasthttp.RequestCtx, data interface{}, err error) {
 		fmt.Fprintf(ctx, callbackFunc+"("+ja.String()+")")
 	}
 }
+
 func serveAPI(listen, token string) (err error) {
 	ctx := log.With(logger.Fields{"func": "serveAPI"})
 	apiToken = token
@@ -411,8 +484,15 @@ func serveAPI(listen, token string) (err error) {
 	router.GET("/reload", timeoutFactory(apiReload))
 	router.GET("/restart", timeoutFactory(apiRestart))
 	router.GET("/config", timeoutFactory(apiConfig))
+	router.GET("/log", timeoutFactory(apiLog))
+	router.GET("/log/file", apiLogFile)
+	router.GET("/log/list", timeoutFactory(apiLogList))
 	ctx.Infof("Api service started")
-	if fasthttp.ListenAndServe(listen, router.Handler) == nil {
+	var h = func(ctx *fasthttp.RequestCtx) {
+		defer access(ctx)
+		router.Handler(ctx)
+	}
+	if fasthttp.ListenAndServe(listen, h) == nil {
 		ctx.Fatalf("start api fail:%s", err)
 	}
 	return
@@ -423,8 +503,25 @@ func servePublish(listen string) (err error) {
 	router.POST("/:name", timeoutFactory(apiPublish))
 	router.GET("/:name", timeoutFactory(apiPublish))
 	ctx.Infof("Publish service started")
-	if fasthttp.ListenAndServe(listen, router.Handler) == nil {
+	var h = func(ctx *fasthttp.RequestCtx) {
+		defer access(ctx)
+		router.Handler(ctx)
+	}
+	if fasthttp.ListenAndServe(listen, h) == nil {
 		ctx.Fatalf("start publish fail:%s", err)
 	}
 	return
+}
+func access(ctx *fasthttp.RequestCtx) {
+	fields := logger.Fields{
+		"code":       strconv.Itoa(ctx.Response.StatusCode()),
+		"uri":        string(ctx.RequestURI()),
+		"remoteAddr": strings.Split(ctx.RemoteAddr().String(), ":")[0],
+		"method":     string(ctx.Method()),
+		"host":       string(ctx.Request.Host()),
+		"referer":    string(ctx.Request.Header.Referer()),
+		"userAgent":  string(ctx.Request.Header.UserAgent()),
+		"response":   string(ctx.Response.Body()),
+	}
+	accessLog.With(fields).Info("")
 }

@@ -351,36 +351,38 @@ func notifyConsumerManager(action string, c consumer, m message) (answer string,
 func getConsumerKey(m message, c consumer) string {
 	return m.Name + "-" + c.ID
 }
-func initMessages() {
+func initMessages() (err error) {
 	ctx := ctxFunc("initMessages")
+	answer := ""
 	for _, m := range messages {
-		_, err := exchangeDeclare(m.Name, m.Mode, m.Durable)
+		_, err = exchangeDeclare(m.Name, m.Mode, m.Durable)
 		ctx1 := ctx.With(logger.Fields{"exchange": m.Name})
-		if err == nil {
-			for _, c := range m.Consumers {
-				_, _, err := queueDeclare(getConsumerKey(m, c), m.Durable)
-				ctx2 := ctx1.With(logger.Fields{"queue": getConsumerKey(m, c)})
-				if err == nil {
-					err := queueBindToExchange(getConsumerKey(m, c), m.Name, c.RouteKey)
-					if err == nil {
-						answer, err := updateConsumerWorker(c, m)
-						ctx3 := ctx2.With(logger.Fields{"call": "updateConsumerWorker"})
-						if err == nil {
-							ctx3.Debugf("answer %s ", answer)
-						} else {
-							ctx3.Warnf("%s ", err)
-						}
-					} else {
-						ctx2.Warnf("bind fail , %s ", err)
-					}
-				} else {
-					ctx2.Warnf("declare fail , %s ", err)
-				}
-			}
-		} else {
+		if err != nil {
 			ctx1.Warnf("declare fail , %s ", err)
+			return
+		}
+		for _, c := range m.Consumers {
+			_, _, err = queueDeclare(getConsumerKey(m, c), m.Durable)
+			ctx2 := ctx1.With(logger.Fields{"queue": getConsumerKey(m, c)})
+			if err != nil {
+				ctx2.Warnf("declare fail , %s ", err)
+				return
+			}
+			err = queueBindToExchange(getConsumerKey(m, c), m.Name, c.RouteKey)
+			if err != nil {
+				ctx2.Warnf("bind fail , %s ", err)
+				return
+			}
+			answer, err = updateConsumerWorker(c, m)
+			ctx3 := ctx2.With(logger.Fields{"call": "updateConsumerWorker"})
+			if err != nil {
+				ctx3.Warnf("%s ", err)
+				return
+			}
+			ctx3.Debugf("answer %s ", answer)
 		}
 	}
+	return
 }
 func restart() (err error) {
 	msgLock.Lock()
@@ -413,6 +415,9 @@ func initConsumerManager() {
 	wrapedConsumers := make(map[string]*manageConsumer)
 	go func() {
 		ctx.Debugf("started")
+		waitSeconds := time.Duration(cfg.GetInt("consume.GoFailWait"))
+		waitSeconds1 := time.Duration(cfg.GetInt("consume.FailWait"))
+		errStr := fmt.Sprintf("fail,sleep %d seconds ... ", waitSeconds)
 		//Consumer Manager worker loop,waiting for control command and exec switch
 		for {
 			//waiting for control data
@@ -459,16 +464,16 @@ func initConsumerManager() {
 							conn, err := pools.Get()
 							if err != nil {
 								pools.Put(conn)
-								ctx1.With(logger.Fields{"call": "pools.Get"}).Warnf("fail,sleep 3 seconds ... %s", err)
-								time.Sleep(time.Second * 3)
+								ctx1.With(logger.Fields{"call": "pools.Get"}).Warnf(errStr+"%s", err)
+								time.Sleep(time.Second * waitSeconds)
 								continue
 							}
 							//3.try get channel on connecton
 							channel, err := conn.(*amqp.Connection).Channel()
 							if err != nil {
 								pools.Put(conn)
-								ctx1.With(logger.Fields{"call": "pools.Put"}).Warnf("fail,sleep 3 seconds ... %s", err)
-								time.Sleep(time.Second * 3)
+								ctx1.With(logger.Fields{"call": "pools.Put"}).Warnf(errStr+"%s", err)
+								time.Sleep(time.Second * waitSeconds)
 								continue
 							}
 							//4.try  declare exchange  on channel
@@ -477,8 +482,8 @@ func initConsumerManager() {
 								wrapedConsumers[c.key].message.Durable)
 							if err != nil {
 								pools.Put(conn)
-								ctx1.With(logger.Fields{"call": "exchangeDeclare"}).Warnf("fail, sleep 3 seconds ... %s", err)
-								time.Sleep(time.Second * 3)
+								ctx1.With(logger.Fields{"call": "exchangeDeclare"}).Warnf(errStr+"%s", err)
+								time.Sleep(time.Second * waitSeconds)
 								continue
 							}
 							//5.try  declare queue  on channel
@@ -487,7 +492,7 @@ func initConsumerManager() {
 							if err != nil {
 								pools.Put(conn)
 								ctx1.With(logger.Fields{"call": "queueDeclare"}).Warnf("fail,", c.key, err)
-								time.Sleep(time.Second * 3)
+								time.Sleep(time.Second * waitSeconds)
 								continue
 							}
 							//6.try  bind queue to exchange
@@ -496,24 +501,24 @@ func initConsumerManager() {
 								wrapedConsumers[c.key].consumer.RouteKey)
 							if err != nil {
 								pools.Put(conn)
-								ctx1.With(logger.Fields{"call": "queueBindToExchange"}).Warnf("fail,sleep 3 seconds ... %s", err)
-								time.Sleep(time.Second * 3)
+								ctx1.With(logger.Fields{"call": "queueBindToExchange"}).Warnf(errStr+"%s", err)
+								time.Sleep(time.Second * waitSeconds)
 								continue
 							}
 							//7.try  set qos on channel
 							err = channel.Qos(1, 0, false)
 							if err != nil {
 								pools.Put(conn)
-								ctx1.With(logger.Fields{"call": "channel.Qos"}).Warnf("fail,sleep 3 seconds ... %s", err)
-								time.Sleep(time.Second * 3)
+								ctx1.With(logger.Fields{"call": "channel.Qos"}).Warnf(errStr+"%s", err)
+								time.Sleep(time.Second * waitSeconds)
 								continue
 							}
 							//8.try consume queue
 							deliveryChn, err := channel.Consume(getQueueName(c.key), "", false, false, false, false, nil)
 							if err != nil {
 								pools.Put(conn)
-								ctx1.With(logger.Fields{"call": "channel.Consume"}).Warnf("fail, sleep 3 seconds ...%s", err)
-								time.Sleep(time.Second * 3)
+								ctx1.With(logger.Fields{"call": "channel.Consume"}).Warnf(errStr+"%s", err)
+								time.Sleep(time.Second * waitSeconds)
 								continue
 							}
 							ctx1.Infof("waiting for message ...")
@@ -538,18 +543,24 @@ func initConsumerManager() {
 										ctx1.Warnf("read deliveryChn fail")
 										goto RETRY
 									}
-									ctx1.Debugf("delivery revecived: %s", c.key, string(delivery.Body)[0:20]+"...")
+									ctx1.Debugf("delivery revecived: %s,%s", c.key, string(delivery.Body)[0:20]+"...")
 									if process(string(delivery.Body), c.consumer) == nil {
 										//process success
 										err = delivery.Ack(false)
+										if err != nil {
+											ctx1.Warnf("ack fail , %s", err)
+											time.Sleep(time.Second * waitSeconds)
+										}
 									} else {
 										//process fail
 										err = delivery.Nack(false, true)
+										if err != nil {
+											ctx1.Warnf("nack fail , %s", err)
+											time.Sleep(time.Second * waitSeconds)
+										} else {
+											time.Sleep(time.Second * waitSeconds1)
+										}
 									}
-									if err != nil {
-										ctx1.Warnf("ack or nack fail , %s", err)
-									}
-									time.Sleep(time.Second * 5)
 								}
 							}
 						}

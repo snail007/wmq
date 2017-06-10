@@ -149,7 +149,7 @@ func queueBindToExchange(queuename, exchangeName, routeKey string) (err error) {
 	if err == nil {
 		err = channel.QueueBind(queuename, routeKey, exchangeName, false, nil)
 		if err == nil {
-			ctx.Debugf("success", queuename, exchangeName)
+			ctx.Debugf("success")
 			return
 		}
 	}
@@ -252,7 +252,7 @@ func initChannelPool() (err error) {
 		InitialCap: poolChannelInitialCap,
 		MaxCap:     poolChannelMaxCap,
 		Release: func(conn interface{}) {
-			if conn != nil {
+			if conn != nil && conn.(*amqp.Channel) != nil {
 				//log.Errorf("channel was released,%s", conn)
 				conn.(*amqp.Channel).Close()
 				conn = nil
@@ -275,12 +275,16 @@ func initChannelPool() (err error) {
 			if conn == nil {
 				return false
 			}
-			err := conn.(*amqp.Channel).Tx()
+			ch, ok := conn.(*amqp.Channel)
+			if !ok || ch == nil {
+				return false
+			}
+			err := ch.Tx()
 			if err != nil {
 				//log.Infof("channel is not active %s", err)
 				return false
 			}
-			conn.(*amqp.Channel).TxCommit()
+			ch.TxCommit()
 			//log.Debugf("channel is active")
 			return true
 		},

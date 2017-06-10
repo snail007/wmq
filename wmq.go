@@ -52,7 +52,9 @@ func main() {
 	ctx.Info("WMQ Service Started")
 	initConsumerManager()
 
-	initMessages()
+	if err := initMessages(); err != nil {
+		ctx.With(logger.Fields{"call": "initMessages()"}).Fatalln("%s", err)
+	}
 
 	if !cfg.GetBool("api-disable") {
 		//init api service
@@ -66,6 +68,7 @@ func main() {
 }
 
 func init() {
+	fmt.Println(poster())
 	var err error
 
 	err = initConfig()
@@ -75,6 +78,7 @@ func init() {
 	}
 
 	initLog()
+
 	ctx := log.With(logger.Fields{"func": "init"})
 	uri = fmt.Sprintf("amqp://%s:%s@%s:%d%s",
 		cfg.GetString("rabbitmq.username"),

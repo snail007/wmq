@@ -16,8 +16,10 @@ IgnoreHeaders = []
 RealIpHeader = "X-Forwarded-For"
 
 [consume]
-#access consumer url  fail and then how many time to sleep
-FailWait = 50000
+#access consumer url  fail and then how many seconds to sleep and retry
+FailWait = 50
+#consumer's goroutine occur error and then how many seconds to sleep and retry
+GoFailWait = 3
 DataFile = "message.json"
 
 [rabbitmq]
@@ -28,9 +30,16 @@ password = "guest"
 vhost = "/"
 #the queue and exchange default prefix
 prefix = "wmq."
+
 [log]
 #which level log to file,default:["info","error","debug"]
 level = ["info","error","debug"]
 dir = "log"
+#log file max size for rotate
+FileMaxSize = 102400000
+#log file max count for rotate to remain
+MaxCount = 3
+#access log on or off
+access = true
 
 

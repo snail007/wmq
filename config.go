@@ -4,10 +4,9 @@ import (
 	"flag"
 	"fmt"
 
-	"strings"
-
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -22,13 +21,15 @@ func initConfig() (err error) {
 	pflag.String("listen-api", "0.0.0.0:3302", "api service listening port")
 	pflag.String("listen-publish", "0.0.0.0:3303", "publish service listening port")
 	pflag.String("api-token", "guest", "access api token")
+	configFile := pflag.String("config", "", "config file path")
 	pflag.Bool("api-disable", false, "disable api service")
 	pflag.String("level", "debug", "console log level,should be one of debug,info,warn,error")
 	version := pflag.Bool("version", false, "show version about current WMQ")
 	example := pflag.Bool("data-example", false, "print example of data-file")
 	pflag.StringSlice("ignore-headers", []string{}, "these http headers will be ignored when access to consumer's url , multiple splitted by comma(,)")
 	pflag.String("realip-header", "X-Forwarded-For", "the publisher's real ip will be set in this http header when access to consumer's url")
-	pflag.Int("fail-wait", 50000, "access consumer url  fail and then how many milliseconds to sleep")
+	pflag.Int("fail-wait", 50000, "access consumer url  fail and then how many milliseconds to sleep  and retry")
+	pflag.Int("go-fail-wait", 3, "consumer's goroutine occur error and then how many seconds to sleep and retry")
 	pflag.String("mq-host", "127.0.0.1", "which host be used when connect to RabbitMQ")
 	pflag.Int("mq-port", 5672, "which port be used when connect to RabbitMQ")
 	pflag.String("mq-username", "guest", "which username be used when connect to RabbitMQ")
@@ -37,6 +38,9 @@ func initConfig() (err error) {
 	pflag.String("mq-prefix", "wmq.", "the queue and exchange default prefix")
 	pflag.String("data-file", "message.json", "which file will store messages")
 	pflag.String("log-dir", "log", "the directory which store log files")
+	pflag.Bool("log-access", true, "access log on or off")
+	pflag.Int64("log-max-size", 102400000, "log file max size(bytes) for rotate")
+	pflag.Int("log-max-count", 3, "log file max count for rotate to remain")
 	pflag.StringSlice("log-level", []string{"info", "error", "debug"}, "log to file level,multiple splitted by comma(,)")
 	pflag.Parse()
 	if *version {
@@ -54,6 +58,7 @@ func initConfig() (err error) {
 	cfg.BindPFlag("publish.IgnoreHeaders", pflag.Lookup("ignore-headers"))
 	cfg.BindPFlag("publish.RealIpHeader", pflag.Lookup("realip-header"))
 	cfg.BindPFlag("consume.FailWait", pflag.Lookup("fail-wait"))
+	cfg.BindPFlag("consume.GoFailWait", pflag.Lookup("go-fail-wait"))
 	cfg.BindPFlag("consume.DataFile", pflag.Lookup("data-file"))
 	cfg.BindPFlag("rabbitmq.host", pflag.Lookup("mq-host"))
 	cfg.BindPFlag("rabbitmq.port", pflag.Lookup("mq-port"))
@@ -63,17 +68,24 @@ func initConfig() (err error) {
 	cfg.BindPFlag("rabbitmq.prefix", pflag.Lookup("mq-prefix"))
 	cfg.BindPFlag("log.dir", pflag.Lookup("log-dir"))
 	cfg.BindPFlag("log.level", pflag.Lookup("log-level"))
+	cfg.BindPFlag("log.access", pflag.Lookup("log-access"))
 	cfg.BindPFlag("log.console-level", pflag.Lookup("level"))
+	cfg.BindPFlag("log.fileMaxSize", pflag.Lookup("log-max-size"))
+	cfg.BindPFlag("log.maxCount", pflag.Lookup("log-max-count"))
 	cfg.SetDefault("default.IgnoreHeaders", []string{"Token", "RouteKey", "Host", "Accept-Encoding", " Content-Length", "Content-Type Connection"})
-
-	cfg.SetConfigName("config")
-	cfg.AddConfigPath("/etc/wmq/")
-	cfg.AddConfigPath("$HOME/.wmq")
-	cfg.AddConfigPath(".wmq")
-	cfg.AddConfigPath(".")
+	fmt.Printf("%s", *configFile)
+	if *configFile != "" {
+		cfg.SetConfigFile(*configFile)
+	} else {
+		cfg.SetConfigName("config")
+		cfg.AddConfigPath("/etc/wmq/")
+		cfg.AddConfigPath("$HOME/.wmq")
+		cfg.AddConfigPath(".wmq")
+		cfg.AddConfigPath(".")
+	}
 	err = cfg.ReadInConfig()
 
-	if err != nil && !strings.Contains(err.Error(), "Not") {
+	if err != nil && !os.IsNotExist(err) {
 		fmt.Printf("%s", err)
 	} else {
 		fmt.Printf("use config file : %s\n", cfg.ConfigFileUsed())
@@ -101,4 +113,17 @@ func printExample() {
     "Name": "test",
     "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
 }]`)
+}
+func poster() string {
+	fg := color.New(color.FgHiYellow).SprintFunc()
+	return fg(`
+██╗    ██╗███╗   ███╗ ██████╗ 
+██║    ██║████╗ ████║██╔═══██╗
+██║ █╗ ██║██╔████╔██║██║   ██║
+██║███╗██║██║╚██╔╝██║██║▄▄ ██║
+╚███╔███╔╝██║ ╚═╝ ██║╚██████╔╝
+ ╚══╝╚══╝ ╚═╝     ╚═╝ ╚══▀▀═╝ 　　　
+Author: snail
+Link  : https://github.com/snail007/wmq
+`)
 }

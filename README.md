@@ -3,25 +3,33 @@ wrapped  message queue which based on rabbitmq,support http protocol
 # Usage:
 <pre>
 Usage of wmq:
-      --api-disable                  disable api service
-      --api-token string             access api token (default "guest")
-      --data-example                 print example of data-file
-      --data-file string             which file will store messages (default "message.json")
-      --fail-wait int                access consumer url  fail and then how many milliseconds to
-                                     sleep (default 50000)
-      --ignore-headers stringSlice   these http headers will be ignored when access to 
-                                     consumer's url , multiple splitted by comma(,)
-      --listen-api string            api service listening port (default "0.0.0.0:3302")
-      --listen-publish string        publish service listening port (default "0.0.0.0:3303")
-      --mq-host string               which host be used when connect to RabbitMQ (default "127.0.0.1")
-      --mq-password string           which password be used when connect to RabbitMQ (default "guest")
-      --mq-port int                  which port be used when connect to RabbitMQ (default 5672)
-      --mq-prefix string             the queue and exchange default prefix (default "wmq.")
-      --mq-username string           which username be used when connect to RabbitMQ (default "guest")
-      --mq-vhost string              which vhost be used when connect to RabbitMQ (default "/")
-      --realip-header string         the publisher's real ip will be set in this http header when
-                                     access to consumer's url (default "X-Forwarded-For")
-      --version                      show version about current WMQ
+--api-disable                  disable api service
+--api-token string             access api token (default "guest")
+--data-example                 print example of data-file
+--data-file string             which file will store messages (default "message.json")
+--fail-wait int                access consumer url  fail and then how many milliseconds 
+                               to sleep (default 50000)
+--ignore-headers stringSlice   these http headers will be ignored when access to consumer's url,
+                               multiple splitted by comma(,)
+--level string                 console log level,should be one of debug,info,warn,error 
+                               (default "debug")
+--listen-api string            api service listening port (default "0.0.0.0:3302")
+--listen-publish string        publish service listening port (default "0.0.0.0:3303")
+--log-access                   access log on or off (default true)
+--log-dir string               the directory which store log files (default "log")
+--log-level stringSlice        log to file level,multiple splitted by comma(,) 
+                               (default [info,error,debug])
+--log-max-count int            log file max count for rotate to remain (default 3)
+--log-max-size int             log file max size(bytes) for rotate (default 102400000)
+--mq-host string               which host be used when connect to RabbitMQ (default "127.0.0.1")
+--mq-password string           which password be used when connect to RabbitMQ (default "guest")
+--mq-port int                  which port be used when connect to RabbitMQ (default 5672)
+--mq-prefix string             the queue and exchange default prefix (default "wmq.")
+--mq-username string           which username be used when connect to RabbitMQ (default "guest")
+--mq-vhost string              which vhost be used when connect to RabbitMQ (default "/")
+--realip-header string         the publisher's real ip will be set in this http header when 
+                                access to consumer's url (default "X-Forwarded-For")
+--version                      show version about current WMQ
 </pre>
 
 # Publishing Message
@@ -303,4 +311,54 @@ note:default manage port is 3302
                             }
                  or {code:0,data:"some error"} 
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
+12.get or search last 100 lines log content
+    request:
+            protocol:http
+            method:get
+            path:/log
+            parameters:
+                keyword:string           //keyword to search
+                type:string             //should be one of: info,error,debug
+                api-token:string        //the api token is setting in config
+                callback:string         //callback function name for jsonp call,
+                                            if no jsonp call ,leave it empty
+    response:
+            type:json
+            column:
+                code:1|0    //1 means success , 0 means fail
+            example:
+                no jsonp:
+                            {
+                                "code": 1, 
+                                "data":"log content"
+                            }
+                 or {code:0,data:"some error"} 
+                jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
+13.get all log file names
+    request:
+            protocol:http
+            method:get
+            path:/log/list
+            parameters:
+                api-token:string        //the api token is setting in config
+                callback:string         //callback function name for jsonp call,
+                                            if no jsonp call ,leave it empty
+    response:
+            type:json
+            column:
+                code:1|0    //1 means success , 0 means fail
+            example:
+                no jsonp:{"code":1,"data":["error.log","info.log"]}
+                 or {code:0,data:"some error"} 
+                jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
+14.download a log file
+    request:
+            protocol:http
+            method:get
+            path:/log/file
+            parameters:
+                file:string             //filename of log file
+                api-token:string        //the api token is setting in config
+    response:
+            your browser will tip download file
 </pre>
