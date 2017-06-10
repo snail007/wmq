@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"strings"
 
 	"os"
 
@@ -84,11 +85,11 @@ func initConfig() (err error) {
 		cfg.AddConfigPath(".")
 	}
 	err = cfg.ReadInConfig()
-
-	if err != nil && !os.IsNotExist(err) {
+	file := cfg.ConfigFileUsed()
+	if err != nil && !strings.Contains(err.Error(), "Not") {
 		fmt.Printf("%s", err)
-	} else {
-		fmt.Printf("use config file : %s\n", cfg.ConfigFileUsed())
+	} else if file != "" {
+		fmt.Printf("use config file : %s\n", file)
 	}
 	cfg.Set("publish.IgnoreHeaders", append(cfg.GetStringSlice("default.IgnoreHeaders"), cfg.GetStringSlice("publish.IgnoreHeaders")...))
 	return
