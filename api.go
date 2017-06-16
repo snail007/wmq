@@ -39,7 +39,7 @@ func apiMessageAdd(ctx *fasthttp.RequestCtx) {
 	Mode := string(ctx.QueryArgs().Peek("Mode"))
 	Token := string(ctx.QueryArgs().Peek("Token"))
 	if Name == "" || DurableS == "" || IsNeedTokenS == "" {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10001"))
 		return
 	}
 	if _, _, err := getMessage(Name); err == nil {
@@ -59,7 +59,7 @@ func apiMessageAdd(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if Mode != "fanout" && Mode != "topic" && Mode != "direct" {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10002"))
 		return
 	}
 	m := message{
@@ -88,8 +88,8 @@ func apiMessageUpdate(ctx *fasthttp.RequestCtx) {
 	IsNeedTokenS := string(ctx.QueryArgs().Peek("IsNeedToken"))
 	Mode := string(ctx.QueryArgs().Peek("Mode"))
 	Token := string(ctx.QueryArgs().Peek("Token"))
-	if Name == "" || DurableS == "" || IsNeedTokenS == "" || Token == "" {
-		response(ctx, "", errors.New("args required"))
+	if Name == "" || DurableS == "" || IsNeedTokenS == "" {
+		response(ctx, "", errors.New("args required.10003"))
 		return
 	}
 	if _, _, err := getMessage(Name); err != nil {
@@ -103,9 +103,13 @@ func apiMessageUpdate(ctx *fasthttp.RequestCtx) {
 	IsNeedToken := false
 	if IsNeedTokenS == "1" {
 		IsNeedToken = true
+		if Token == "" {
+			response(ctx, "", errors.New("args required.10013"))
+			return
+		}
 	}
 	if Mode != "fanout" && Mode != "topic" && Mode != "direct" {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10004"))
 		return
 	}
 	m := message{
@@ -167,7 +171,7 @@ func apiConsumerAdd(ctx *fasthttp.RequestCtx) {
 	URL := string(ctx.QueryArgs().Peek("URL"))
 
 	if exchangeName == "" || CodeS == "" || CheckCodeS == "" || TimeoutS == "" || URL == "" {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10005"))
 		return
 	}
 	msg, _, err := getMessage(exchangeName)
@@ -181,11 +185,11 @@ func apiConsumerAdd(ctx *fasthttp.RequestCtx) {
 		CheckCode = true
 	}
 	if ok, err := regexp.Match(`[1-9]\d{1,2}`, []byte(CodeS)); !ok || err != nil {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10006"))
 		return
 	}
 	if ok, err := regexp.Match(`[1-9]\d*`, []byte(TimeoutS)); !ok || err != nil {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10007"))
 		return
 	}
 	CheckCode = true
@@ -221,7 +225,7 @@ func apiConsumerUpdate(ctx *fasthttp.RequestCtx) {
 	URL := string(ctx.QueryArgs().Peek("URL"))
 
 	if exchangeName == "" || CodeS == "" || CheckCodeS == "" || TimeoutS == "" || URL == "" {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10008"))
 		return
 	}
 	msg, _, err := getMessage(exchangeName)
@@ -239,11 +243,11 @@ func apiConsumerUpdate(ctx *fasthttp.RequestCtx) {
 		CheckCode = true
 	}
 	if ok, err := regexp.Match(`[1-9]\d{1,2}`, []byte(CodeS)); !ok || err != nil {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10009"))
 		return
 	}
 	if ok, err := regexp.Match(`[1-9]\d*`, []byte(TimeoutS)); !ok || err != nil {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10010"))
 		return
 	}
 	CheckCode = true
@@ -352,7 +356,7 @@ func apiReload(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	reload()
-	response(ctx, "{\"code\":1}", nil)
+	response(ctx, "", nil)
 }
 func apiRestart(ctx *fasthttp.RequestCtx) {
 	if !checkRequest(ctx) {
@@ -390,7 +394,7 @@ func apiLogFile(ctx *fasthttp.RequestCtx) {
 	}
 	filename := string(ctx.QueryArgs().Peek("file"))
 	if filename == "" || strings.ContainsAny(filename, "/\\") {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10011"))
 		return
 	}
 	f, _ := filepath.Abs(cfg.GetString("log.dir"))
@@ -413,7 +417,7 @@ func apiLog(ctx *fasthttp.RequestCtx) {
 	keyword := string(ctx.QueryArgs().Peek("keyword"))
 	logType := string(ctx.QueryArgs().Peek("type"))
 	if logType == "" {
-		response(ctx, "", errors.New("args required"))
+		response(ctx, "", errors.New("args required.10012"))
 		return
 	}
 	file, _ := filepath.Abs(filepath.Join(cfg.GetString("log.dir"), logType) + ".log")

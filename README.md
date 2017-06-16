@@ -255,6 +255,7 @@ note:default manage port is 3302
             path:/consumer/status
             parameters:
                 Name:string         //message name
+                ID:string           //consumer's ID
                 api-token:string    //the api token is setting in config
                 callback:string     //callback function name for jsonp call,
                                       if no jsonp call ,leave it empty
@@ -282,7 +283,6 @@ note:default manage port is 3302
             path:/message/status
             parameters:
                 Name:string         //message name
-                ID:string           //consumer's ID
                 api-token:string    //the api token is setting in config
                 callback:string     //callback function name for jsonp call,
                                       if no jsonp call ,leave it empty
