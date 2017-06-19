@@ -2,7 +2,7 @@
 wrapped  message queue which based on rabbitmq,support http protocol
 
 # Requirement
-Linux are recommend,on windows the api "12.get or search last 100 lines log content" can not be worked.
+Linux are recommended,on windows the api "12.get or search last 100 lines log content" cannot be worked.
 
 # Usage:
 <pre>
