@@ -319,8 +319,6 @@ note:default manage port is 3302
             parameters:
                 keyword:string           //keyword to search
                 type:string             //should be one of: info,error,debug
-                file:string             //filename of log file，no extension，
-                                          such as： info 、debug、error
                 api-token:string        //the api token is setting in config
                 callback:string         //callback function name for jsonp call,
                                             if no jsonp call ,leave it empty
