@@ -647,7 +647,7 @@ func process(content string, c consumer) (err error) {
 		headerMap[k] = child.Data().(string)
 	}
 	client := resty.New().
-		SetTimeout(time.Millisecond*time.Duration(c.Timeout)).R().
+		SetTimeout(time.Second*time.Duration(c.Timeout)).R().
 		SetHeaders(headerMap).
 		SetHeader(cfg.GetString("publish.RealIpHeader"), ip).
 		SetHeader("User-Agent", "wmq v"+cfg.GetString("wmq.version")+" - https://github.com/snail007/wmq")
