@@ -91,6 +91,7 @@ func initConfig() (err error) {
 	} else if file != "" {
 		fmt.Printf("use config file : %s\n", file)
 	}
+	err = nil
 	cfg.Set("publish.IgnoreHeaders", append(cfg.GetStringSlice("default.IgnoreHeaders"), cfg.GetStringSlice("publish.IgnoreHeaders")...))
 	return
 }
