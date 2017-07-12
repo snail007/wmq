@@ -218,7 +218,6 @@ note:default manage port is 3302
             method:get
             path:/config
             parameters:
-                Name:string         //message name
                 api-token:string    //the api token is setting in config
                 callback:string     //callback function name for jsonp call,
                                       if no jsonp call ,leave it empty
@@ -229,6 +228,11 @@ note:default manage port is 3302
             example:
                 no jsonp:
                             [{
+                                "Durable": false,
+                                "IsNeedToken": true,
+                                "Mode": "topic",
+                                "Name": "test",
+                                "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
                                 "Comment": "",
                                 "Consumers": [{
                                         "Comment": "",
@@ -240,11 +244,6 @@ note:default manage port is 3302
                                         "URL": "http://test.com/wmq.php"
                                     }
                                 ],
-                                "Durable": false,
-                                "IsNeedToken": true,
-                                "Mode": "topic",
-                                "Name": "test",
-                                "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
                             }]
                  or {code:0,data:"some error"} 
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
