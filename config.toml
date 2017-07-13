@@ -35,11 +35,13 @@ prefix = "wmq."
 #which level log to file,default:["info","error","debug"]
 level = ["info","error","debug"]
 dir = "log"
-#log file max size for rotate
+#log file max size(bytes) for rotate
 FileMaxSize = 102400000
 #log file max count for rotate to remain
 MaxCount = 3
 #access log on or off
 access = true
+#log post data on or off
+post = false
 
 

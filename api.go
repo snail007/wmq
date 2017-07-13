@@ -2,16 +2,16 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
-
-	"path/filepath"
 
 	"os"
 
@@ -330,15 +330,25 @@ func apiPublish(ctx *fasthttp.RequestCtx) {
 	headerMap := make(map[string]string)
 	ignores := cfg.GetStringSlice("publish.IgnoreHeaders")
 	ctx.Request.Header.VisitAll(func(k, v []byte) {
-		if in, _ := inArray(string(k), ignores); !in {
-			headerMap[string(k)] = string(v)
+		var found = false
+		for _, ignore := range ignores {
+			k1 := strings.ToLower(strings.TrimSpace(string(k)))
+			k2 := strings.ToLower(strings.TrimSpace(ignore))
+			if k1 == k2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			headerMap[strings.TrimSpace(string(k))] = string(v)
 		}
 	})
+	encodeString := base64.StdEncoding.EncodeToString(ctx.Request.Body())
 	mqMessage := gabs.New()
 	a, _ := json.Marshal(headerMap)
 	mqMessage.Set(string(a), "header")
 	mqMessage.Set(ctx.RemoteIP(), "ip")
-	mqMessage.Set(string(ctx.Request.Body()), "body")
+	mqMessage.Set(encodeString, "body")
 	mqMessage.Set(method, "method")
 	mqMessage.Set(queryString, "args")
 	err = publish(mqMessage.String(), exchangeName, routeKey, token)
@@ -517,6 +527,10 @@ func servePublish(listen string) (err error) {
 	return
 }
 func access(ctx *fasthttp.RequestCtx) {
+	post := ""
+	if cfg.GetBool("log.post") {
+		post = string(ctx.Request.Body())
+	}
 	fields := logger.Fields{
 		"code":       strconv.Itoa(ctx.Response.StatusCode()),
 		"uri":        string(ctx.RequestURI()),
@@ -526,6 +540,7 @@ func access(ctx *fasthttp.RequestCtx) {
 		"referer":    string(ctx.Request.Header.Referer()),
 		"userAgent":  string(ctx.Request.Header.UserAgent()),
 		"response":   string(ctx.Response.Body()),
+		"post":       post,
 	}
 	accessLog.With(fields).Info("")
 }

@@ -1,12 +1,12 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
-
 	"time"
 
 	"runtime"
@@ -14,13 +14,12 @@ import (
 	"strings"
 
 	"io/ioutil"
-
 	"sync"
 
 	"github.com/Jeffail/gabs"
 	logger "github.com/snail007/mini-logger"
 	"github.com/streadway/amqp"
-	"gopkg.in/resty.v0"
+	"github.com/valyala/fasthttp"
 )
 
 type message struct {
@@ -543,7 +542,8 @@ func initConsumerManager() {
 										ctx1.Warnf("read deliveryChn fail")
 										goto RETRY
 									}
-									ctx1.Debugf("delivery revecived: %s,%s", c.key, string(delivery.Body)[0:20]+"...")
+									body := string(delivery.Body)[0:50] + "..."
+									ctx1.Debugf("delivery revecived: %s,%s", c.key, body)
 									if process(string(delivery.Body), c.consumer) == nil {
 										//process success
 										err = delivery.Ack(false)
@@ -617,6 +617,7 @@ func loadMessagesFromFile(configFilePath0 string) (messages0 []message, err erro
 func process(content string, c consumer) (err error) {
 	ctx := ctxFunc("process")
 	//content = "{\"body\":\"sss\",\"header\":{\"ID\":\"test\"},\"ip\":\"127.0.0.1\",\"method\":\"get\"}"
+
 	jsonParsed, err := gabs.ParseJSON([]byte(content))
 	ctx1 := ctx.With(logger.Fields{"call": "gabs.ParseJSON"})
 	if err != nil {
@@ -628,8 +629,7 @@ func process(content string, c consumer) (err error) {
 		ctx1.Warnf("message from rabbitmq not suppported and drop it, msg : %s", content[:20])
 		return nil
 	}
-
-	body := jsonParsed.S("body").Data()
+	body := jsonParsed.S("body").Data().(string)
 	header, _ := jsonParsed.S("header").ChildrenMap()
 	ip := jsonParsed.S("ip").Data().(string)
 	args := jsonParsed.S("args").Data().(string)
@@ -646,20 +646,39 @@ func process(content string, c consumer) (err error) {
 	for k, child := range header {
 		headerMap[k] = child.Data().(string)
 	}
-	client := resty.New().
-		SetTimeout(time.Second*time.Duration(c.Timeout)).R().
-		SetHeaders(headerMap).
-		SetHeader(cfg.GetString("publish.RealIpHeader"), ip).
-		SetHeader("User-Agent", "wmq v"+cfg.GetString("wmq.version")+" - https://github.com/snail007/wmq")
-	var resp *resty.Response
+	client := fasthttp.Client{}
+	client.MaxConnsPerHost = 65535
+	req := &fasthttp.Request{}
+	resp := &fasthttp.Response{}
+	req.SetRequestURI(url)
+	for k, v := range headerMap {
+		req.Header.Set(k, v)
+	}
+	req.Header.Set(cfg.GetString("publish.RealIpHeader"), ip)
+	req.Header.SetUserAgent("wmq v" + cfg.GetString("wmq.version") + " - https://github.com/snail007/wmq")
+
 	ctx2 := ctx.With(logger.Fields{"http": c.URL, "method": method})
 	if method == "post" {
-		resp, err = client.SetBody(body).Post(url)
+		if body != "" {
+			var decodeBytes []byte
+			decodeBytes, err = base64.StdEncoding.DecodeString(body)
+			if err != nil {
+				err = nil
+				ctx2.Warnf("decode post body fail and drop it , content : " + content)
+				return
+			}
+			req.SetBody(decodeBytes)
+		}
+		req.Header.SetMethod("POST")
 	} else if method == "get" {
-		resp, err = client.Get(url)
+		req.Header.SetMethod("GET")
 	} else {
 		err = fmt.Errorf("method [ %s ] not supported", method)
+		ctx2.Warnf("consume fail,%s", err)
+		return
 	}
+	//log.Warnf("%s", req)
+	err = client.DoTimeout(req, resp, time.Duration(time.Duration(c.Timeout)*time.Millisecond))
 	if err != nil {
 		ctx2.Warnf("consume fail,%s", err)
 		return
