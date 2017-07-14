@@ -10,7 +10,7 @@ token = "guest"
 
 [publish]
 #these http headers will be ignored when access to consumer's url
-#User-Agent Token RouteKey Host Accept-Encoding  Content-Length Content-Type Connection headers will be ignored by force
+#Headers : "User-Agent Token RouteKey Host Accept-Encoding  Content-Length Connection"  will be ignored by force
 IgnoreHeaders = []
 #the publisher's real ip will be set in this http header when access to consumer's url
 RealIpHeader = "X-Forwarded-For"
