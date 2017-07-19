@@ -231,24 +231,27 @@ note:default manage port is 3302
                 code:1|0    //1 means success , 0 means fail
             example:
                 no jsonp:
-                            [{
-                                "Durable": false,
-                                "IsNeedToken": true,
-                                "Mode": "topic",
-                                "Name": "test",
-                                "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
-                                "Comment": "",
-                                "Consumers": [{
+                        {
+                            "code": 1, 
+                            "data": [{
+                                        "Durable": false,
+                                        "IsNeedToken": true,
+                                        "Mode": "topic",
+                                        "Name": "test",
+                                        "Token": "JQJsUOqYzYZZgn8gUvs7sIinrJ0tDD8J"
                                         "Comment": "",
-                                        "ID": "111",
-                                        "Code": 200,
-                                        "CheckCode": true,
-                                        "RouteKey": "#",
-                                        "Timeout": 5000,
-                                        "URL": "http://test.com/wmq.php"
-                                    }
-                                ],
-                            }]
+                                        "Consumers": [{
+                                                "Comment": "",
+                                                "ID": "111",
+                                                "Code": 200,
+                                                "CheckCode": true,
+                                                "RouteKey": "#",
+                                                "Timeout": 5000,
+                                                "URL": "http://test.com/wmq.php"
+                                            }
+                                        ],
+                                    }]
+                        }
                  or {code:0,data:"some error"} 
                 jsonp:callbackxxx({code:1,data:[...]}) or callbackxxx({code:0,data:"some error"})
 10.get a consumer status

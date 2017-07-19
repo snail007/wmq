@@ -381,8 +381,8 @@ func apiConfig(ctx *fasthttp.RequestCtx) {
 		tokenError(ctx)
 		return
 	}
-	j, e := config()
-	response(ctx, j, e)
+	//j, e := config()
+	response(ctx, messages, nil)
 }
 func apiLogList(ctx *fasthttp.RequestCtx) {
 	if !checkRequest(ctx) {
