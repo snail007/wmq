@@ -433,7 +433,7 @@ func apiLog(ctx *fasthttp.RequestCtx) {
 	file, _ := filepath.Abs(filepath.Join(cfg.GetString("log.dir"), logType) + ".log")
 	commandStr := ""
 	if keyword == "" {
-		commandStr = fmt.Sprintf("tail -n 100 -f %s", file)
+		commandStr = fmt.Sprintf("tail -n 100 %s", file)
 	} else {
 		commandStr = fmt.Sprintf("grep \"%s\" %s |tail -n 100", keyword, file)
 	}
