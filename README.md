@@ -4,7 +4,7 @@ wrapped  message queue which based on rabbitmq,support http protocol
 # Requirement
 Linux are recommended,on windows the api "12.get or search last 100 lines log content" cannot be worked.
 # Notes
-This is a console based web ui to manage wmq , https://github.com/phachon/wmq-admin  
+This is a web ui based console to manage wmq , https://github.com/phachon/wmq-admin
 Thx @phachon  
 # Usage:
 <pre>
