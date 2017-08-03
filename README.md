@@ -1,9 +1,9 @@
 # WMQ
 Wrapped  message queue which based on rabbitmq,support http protocol  
-You can find pre-complied binary here https://github.com/snail007/wmq-release  
 # Requirement
 Linux are recommended,on windows the api "12.get or search last 100 lines log content" cannot be worked.
 # Notes
+You can find pre-complied binary here https://github.com/snail007/wmq-release  
 This is a web ui based console to manage wmq , https://github.com/phachon/wmq-admin  
 Thx @phachon  
 # Usage:
