@@ -51,7 +51,7 @@ note:default publish port is 3303
                                         :query_string is any query string you need
         header:
             Token:string        //message's Token , if not need token ,leave it empty
-            RouteKey:string     //the api token is setting in config
+            RouteKey:string     //message's routing key , if not need token ,leave it empty
     response:
         httpcode:204|500      //204:menas success 500:means fail and output is error info
 </pre>
