@@ -75,7 +75,7 @@ func initConfig() (err error) {
 	cfg.BindPFlag("log.console-level", pflag.Lookup("level"))
 	cfg.BindPFlag("log.fileMaxSize", pflag.Lookup("log-max-size"))
 	cfg.BindPFlag("log.maxCount", pflag.Lookup("log-max-count"))
-	cfg.SetDefault("default.IgnoreHeaders", []string{"Token", "RouteKey", "Host", "Accept-Encoding", "Content-Length", "Connection"})
+	cfg.SetDefault("default.IgnoreHeaders", []string{"Token", "RouteKey", "Host", "Expect", "Accept-Encoding", "Content-Length", "Connection"})
 	fmt.Printf("%s", *configFile)
 	if *configFile != "" {
 		cfg.SetConfigFile(*configFile)
