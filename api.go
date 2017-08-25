@@ -138,10 +138,16 @@ func apiMessageDelete(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	err = deleteMessage(*msg)
-	if err == nil {
-		err = writeMessagesToFile(messages, cfg.GetString("consume.DataFile"))
+	if err != nil {
+		response(ctx, "", err)
+		return
 	}
-	response(ctx, err, err)
+	err = writeMessagesToFile(messages, cfg.GetString("consume.DataFile"))
+	if err != nil {
+		response(ctx, "", err)
+		return
+	}
+	response(ctx, "", nil)
 }
 func apiMessageStatus(ctx *fasthttp.RequestCtx) {
 	if !checkRequest(ctx) {
@@ -286,10 +292,16 @@ func apiConsumerDelete(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	err = deleteConsumer(*msg, *c)
-	if err == nil {
-		err = writeMessagesToFile(messages, cfg.GetString("consume.DataFile"))
+	if err != nil {
+		response(ctx, "", err)
+		return
 	}
-	response(ctx, err, err)
+	err = writeMessagesToFile(messages, cfg.GetString("consume.DataFile"))
+	if err != nil {
+		response(ctx, "", err)
+		return
+	}
+	response(ctx, "", nil)
 }
 func apiConsumerStatus(ctx *fasthttp.RequestCtx) {
 	if !checkRequest(ctx) {

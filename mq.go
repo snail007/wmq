@@ -3,7 +3,6 @@ package main
 import (
 	"net"
 	"sync"
-	"time"
 
 	logger "github.com/snail007/mini-logger"
 	"github.com/streadway/amqp"
@@ -216,9 +215,9 @@ func initPool() (err error) {
 					if err != nil {
 						return nil, err
 					}
-					if err := c.SetDeadline(time.Now().Add(mqConnectionAndDeadlineTimeout)); err != nil {
-						return nil, err
-					}
+					// if err := c.SetDeadline(time.Now().Add(mqConnectionAndDeadlineTimeout)); err != nil {
+					// 	return nil, err
+					// }
 					return c, nil
 				},
 			})
@@ -226,7 +225,7 @@ func initPool() (err error) {
 				ctx.Debugf("Connect to RabbitMQ SUCCESS")
 				return
 			}
-			ctx.Debugf("Connect to RabbitMQ FAIL")
+			ctx.Debugf("Connect to RabbitMQ FAIL,ERR:%s", err)
 			return
 		},
 		IsActive: func(conn interface{}) (ok bool) {

@@ -211,12 +211,19 @@ func deleteMessage(m message) (err error) {
 			ctx.With(logger.Fields{"call": "stopConsumerWorker"}).Infof("delete fail ,%s", e)
 			return
 		}
+		//delete queue
 		er := deleteQueue(getConsumerKey(*msg, c))
 		if er != nil {
 			err = er
 			ctx.With(logger.Fields{"call": "deleteQueue"}).Infof("delete fail, %s", e)
 			return
 		}
+	}
+	//delete exchange
+	err = deleteExchange(msg.Name)
+	if err != nil {
+		ctx.With(logger.Fields{"deleteExchange": msg.Name}).Warnf("delete fail,ERR:%s", err)
+		return
 	}
 	//update messsages data
 	messages = append(messages[:i], messages[i+1:]...)
@@ -261,13 +268,31 @@ func deleteConsumer(msg message, c0 consumer) (err error) {
 	ctx := ctxFunc("deleteConsumer")
 	msgLock.Lock()
 	defer msgLock.Unlock()
-	_, i0, i, _ := getConsumer(msg.Name, c0.ID)
+	_, i0, i, err := getConsumer(msg.Name, c0.ID)
+	if err != nil {
+		ctx.With(logger.Fields{"consumer": getConsumerKey(msg, c0)}).Warnf("delete fail,ERR:%s", err)
+		return
+	}
 	//delete messages consumer
 	messages[i0].Consumers = append(messages[i0].Consumers[:i], messages[i0].Consumers[i+1:]...)
 	//stop consumer
 	_, err = stopConsumerWorker(c0, msg)
+	if err != nil {
+		ctx.With(logger.Fields{"consumer": getConsumerKey(msg, c0)}).Warnf("delete fail,ERR:%s", err)
+		return
+	}
 	//update messages worker
-	initMessages()
+	err = initMessages()
+	if err != nil {
+		ctx.With(logger.Fields{"consumer": getConsumerKey(msg, c0)}).Warnf("delete fail,ERR:%s", err)
+		return
+	}
+	//delete queue
+	err = deleteQueue(getConsumerKey(msg, c0))
+	if err != nil {
+		ctx.With(logger.Fields{"deleteQueue": getConsumerKey(msg, c0)}).Warnf("delete fail,ERR:%s", err)
+		return
+	}
 	ctx.With(logger.Fields{"consumer": getConsumerKey(msg, c0)}).Infof("deleted")
 	return
 }
@@ -445,8 +470,13 @@ func initConsumerManager() {
 				if t == "insert" {
 					//start consumer go
 					go func() {
+						var channel *amqp.Channel
 						defer func() {
 							delete(wrapedConsumers, c.key)
+							if channel != nil {
+								channel.Close()
+								ctx1.Warnf("channel %s closed ", c.key)
+							}
 							ctx1.Warnf("goroutine exited")
 						}()
 						//0.consumer worker start
@@ -468,7 +498,7 @@ func initConsumerManager() {
 								continue
 							}
 							//3.try get channel on connecton
-							channel, err := conn.(*amqp.Connection).Channel()
+							channel, err = conn.(*amqp.Connection).Channel()
 							if err != nil {
 								pools.Put(conn)
 								ctx1.With(logger.Fields{"call": "pools.Put"}).Warnf(errStr+"%s", err)
@@ -542,7 +572,8 @@ func initConsumerManager() {
 										ctx1.Warnf("read deliveryChn fail")
 										goto RETRY
 									}
-									body := string(delivery.Body)[0:50] + "..."
+									//body := string(delivery.Body)[0:50] + "..."
+									body := string(delivery.Body)
 									ctx1.Debugf("delivery revecived: %s,%s", c.key, body)
 									if process(string(delivery.Body), c.consumer) == nil {
 										//process success

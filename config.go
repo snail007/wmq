@@ -17,7 +17,7 @@ var (
 )
 
 func initConfig() (err error) {
-	cfg.SetDefault("wmq.version", "1.1")
+	cfg.SetDefault("wmq.version", "1.3")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.String("listen-api", "0.0.0.0:3302", "api service listening port")
 	pflag.String("listen-publish", "0.0.0.0:3303", "publish service listening port")
@@ -41,6 +41,7 @@ func initConfig() (err error) {
 	pflag.String("log-dir", "log", "the directory which store log files")
 	pflag.Bool("log-access", true, "access log on or off")
 	pflag.Bool("log-post", false, "log post data on or off")
+
 	pflag.Int64("log-max-size", 102400000, "log file max size(bytes) for rotate")
 	pflag.Int("log-max-count", 3, "log file max count for rotate to remain")
 	pflag.StringSlice("log-level", []string{"info", "error", "debug"}, "log to file level,multiple splitted by comma(,)")
