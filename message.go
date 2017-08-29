@@ -436,9 +436,10 @@ func stopAllConsumer() (err error) {
 }
 func initConsumerManager() {
 	ctx := ctxFunc("initConsumerManager")
-	wrapedConsumers := make(map[string]*manageConsumer)
 	go func() {
 		ctx.Debugf("started")
+		//wrapedConsumers := make(map[string]manageConsumer)
+		wrapedConsumers := NewConcurrentMap()
 		waitSeconds := time.Duration(cfg.GetInt("consume.GoFailWait"))
 		waitSeconds1 := time.Duration(cfg.GetInt("consume.FailWait"))
 		errStr := fmt.Sprintf("fail,sleep %d seconds ... ", waitSeconds)
@@ -446,36 +447,38 @@ func initConsumerManager() {
 		for {
 			//waiting for control data
 			wrapedConsumer := <-consumerManageReadChan
-
+			key := getConsumerKey(wrapedConsumer.message, wrapedConsumer.consumer)
 			//preprocess for control data
-			c := &manageConsumer{
-				wrapedConsumer:    wrapedConsumer,
-				consumerReadChan:  make(chan string, 1),
-				consumerWriteChan: make(chan string, 1),
-				key:               getConsumerKey(wrapedConsumer.message, wrapedConsumer.consumer),
-			}
-			ctx1 := ctx.With(logger.Fields{"wrapedConsumer": c.key})
+
+			ctx1 := ctx.With(logger.Fields{"wrapedConsumer": key})
 			ctx1.Debugf("revecived")
 			//decide what to do
 			switch wrapedConsumer.action {
 			case "update": //update or insert consumer
 				t := "update"
-				if _, ok := wrapedConsumers[c.key]; !ok {
+				if item, ok := wrapedConsumers.Get(key); !ok {
 					t = "insert"
 				} else {
-					c.lasttime = wrapedConsumers[c.key].lasttime
+					_item := item.(manageConsumer)
+					_item.lasttime = time.Now().Unix()
+					wrapedConsumers.Set(key, _item)
 				}
 				ctx1.Debugf("%s", t)
-				wrapedConsumers[c.key] = c
+				wrapedConsumers.Set(key, manageConsumer{
+					wrapedConsumer:    wrapedConsumer,
+					consumerReadChan:  make(chan string, 1),
+					consumerWriteChan: make(chan string, 1),
+					key:               key,
+				})
 				if t == "insert" {
 					//start consumer go
 					go func() {
 						var channel *amqp.Channel
 						defer func() {
-							delete(wrapedConsumers, c.key)
+							wrapedConsumers.Remove(key)
 							if channel != nil {
 								channel.Close()
-								ctx1.Warnf("channel %s closed ", c.key)
+								ctx1.Warnf("channel %s closed ", key)
 							}
 							ctx1.Warnf("goroutine exited")
 						}()
@@ -483,12 +486,15 @@ func initConsumerManager() {
 						for {
 						RETRY:
 							//1.check if exists in wrapedConsumers data
-							if _, ok := wrapedConsumers[c.key]; !ok {
+							if _, ok := wrapedConsumers.Get(key); !ok {
 								ctx1.Warnf("not found , now exit")
 								runtime.Goexit()
 							}
 							//update consumer active time
-							wrapedConsumers[c.key].lasttime = time.Now().Unix()
+							item, _ := wrapedConsumers.Get(key)
+							_item := item.(manageConsumer)
+							_item.lasttime = time.Now().Unix()
+							wrapedConsumers.Set(key, _item)
 							//2.try get connection
 							conn, err := pools.Get()
 							if err != nil {
@@ -506,9 +512,11 @@ func initConsumerManager() {
 								continue
 							}
 							//4.try  declare exchange  on channel
-							_, err = exchangeDeclare(wrapedConsumers[c.key].message.Name,
-								wrapedConsumers[c.key].message.Mode,
-								wrapedConsumers[c.key].message.Durable)
+							item, _ = wrapedConsumers.Get(key)
+							_item = item.(manageConsumer)
+							_, err = exchangeDeclare(_item.message.Name,
+								_item.message.Mode,
+								_item.message.Durable)
 							if err != nil {
 								pools.Put(conn)
 								ctx1.With(logger.Fields{"call": "exchangeDeclare"}).Warnf(errStr+"%s", err)
@@ -516,18 +524,18 @@ func initConsumerManager() {
 								continue
 							}
 							//5.try  declare queue  on channel
-							_, _, err = queueDeclare(getConsumerKey(wrapedConsumers[c.key].message, wrapedConsumers[c.key].consumer),
-								wrapedConsumers[c.key].message.Durable)
+							_, _, err = queueDeclare(getConsumerKey(_item.message, _item.consumer),
+								_item.message.Durable)
 							if err != nil {
 								pools.Put(conn)
-								ctx1.With(logger.Fields{"call": "queueDeclare"}).Warnf("fail,", c.key, err)
+								ctx1.With(logger.Fields{"call": "queueDeclare"}).Warnf("fail,", key, err)
 								time.Sleep(time.Second * waitSeconds)
 								continue
 							}
 							//6.try  bind queue to exchange
-							err = queueBindToExchange(getConsumerKey(wrapedConsumers[c.key].message, wrapedConsumers[c.key].consumer),
-								wrapedConsumers[c.key].message.Name,
-								wrapedConsumers[c.key].consumer.RouteKey)
+							err = queueBindToExchange(getConsumerKey(_item.message, _item.consumer),
+								_item.message.Name,
+								_item.consumer.RouteKey)
 							if err != nil {
 								pools.Put(conn)
 								ctx1.With(logger.Fields{"call": "queueBindToExchange"}).Warnf(errStr+"%s", err)
@@ -543,7 +551,7 @@ func initConsumerManager() {
 								continue
 							}
 							//8.try consume queue
-							deliveryChn, err := channel.Consume(getQueueName(c.key), "", false, false, false, false, nil)
+							deliveryChn, err := channel.Consume(getQueueName(key), "", false, false, false, false, nil)
 							if err != nil {
 								pools.Put(conn)
 								ctx1.With(logger.Fields{"call": "channel.Consume"}).Warnf(errStr+"%s", err)
@@ -553,17 +561,20 @@ func initConsumerManager() {
 							ctx1.Infof("waiting for message ...")
 							//worker loop,use chan waiting for control command or delivery
 							for {
-								if _, ok := wrapedConsumers[c.key]; !ok {
+								if _, ok := wrapedConsumers.Get(key); !ok {
 									ctx1.Warnf("not found , now exit")
 									runtime.Goexit()
 								}
 								//update consumer active time
-								wrapedConsumers[c.key].lasttime = time.Now().Unix()
+								item, _ := wrapedConsumers.Get(key)
+								_item := item.(manageConsumer)
+								_item.lasttime = time.Now().Unix()
+								wrapedConsumers.Set(key, _item)
 								select {
-								case cmd := <-wrapedConsumers[c.key].consumerReadChan:
+								case cmd := <-_item.consumerReadChan:
 									if cmd == "exit" {
 										pools.Put(conn)
-										wrapedConsumers[c.key].consumerWriteChan <- "exit_ok"
+										_item.consumerWriteChan <- "exit_ok"
 										runtime.Goexit()
 									}
 								case delivery, ok := <-deliveryChn:
@@ -574,8 +585,8 @@ func initConsumerManager() {
 									}
 									//body := string(delivery.Body)[0:50] + "..."
 									body := string(delivery.Body)
-									ctx1.Debugf("delivery revecived: %s,%s", c.key, body)
-									if process(string(delivery.Body), c.consumer) == nil {
+									ctx1.Debugf("delivery revecived: %s,%s", key, body)
+									if process(string(delivery.Body), _item.consumer) == nil {
 										//process success
 										err = delivery.Ack(false)
 										if err != nil {
@@ -599,17 +610,19 @@ func initConsumerManager() {
 				}
 				consumerManageWriteChan <- "completed"
 			case "delete": //stop consumer
-				if _, ok := wrapedConsumers[c.key]; ok {
+				if item, ok := wrapedConsumers.Get(key); ok {
+					_item := item.(manageConsumer)
 					ctx1.Debugf("sending stop singal to goroutine ...")
-					wrapedConsumers[c.key].consumerReadChan <- "exit"
+					_item.consumerReadChan <- "exit"
 					ctx1.Debugf("send  stop singal to goroutine success")
 				}
 				consumerManageWriteChan <- "completed"
 			case "status": //get consumer last active time
-				v, ok := wrapedConsumers[c.key]
+				v, ok := wrapedConsumers.Get(key)
 				var t int64
 				if ok {
-					t = v.lasttime
+					_v := v.(manageConsumer)
+					t = _v.lasttime
 				}
 				consumerManageWriteChan <- fmt.Sprintf("%d", t)
 			default:
