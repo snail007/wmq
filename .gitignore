@@ -2,4 +2,5 @@ log/*
 .DS_Store
 .*
 wmq
+wmq_linux_amd64-*
 !.gitignore

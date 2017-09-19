@@ -17,7 +17,7 @@ var (
 )
 
 func initConfig() (err error) {
-	cfg.SetDefault("wmq.version", "1.4")
+	cfg.SetDefault("wmq.version", "1.5")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.String("listen-api", "0.0.0.0:3302", "api service listening port")
 	pflag.String("listen-publish", "0.0.0.0:3303", "publish service listening port")
