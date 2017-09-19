@@ -30,25 +30,7 @@ func panicHandler(output string) {
 }
 func main() {
 	ctx := log.With(logger.Fields{"func": "main"})
-	// defer func() {
-	// 	logger.Flush()
-	// }()
-	// l1 := logger.New(false, nil)
-	// l1.AddWriter(logger.NewDefaultConsoleWriter(), logger.AllLevels)
-	// l1.Info("hello world4")
-	// ctx := l1.With(logger.Fields{"user": "test"})
-	// ctx.Info("hello world")
-	// subctx := ctx.With(logger.Fields{"queue": "haha"})
-	// subctx.Info("show")
 
-	// l1.Info("aaa")
-	// subctx.Info("bbb")
-	// ctx.Info("ccc")
-	// // time.Sleep(time.Second * 3)
-
-	// return
-	// l1.Info("hello world5")
-	//init service
 	ctx.Info("WMQ Service Started")
 	initConsumerManager()
 
@@ -80,23 +62,27 @@ func init() {
 	initLog()
 
 	ctx := log.With(logger.Fields{"func": "init"})
+	vhost := cfg.GetString("rabbitmq.vhost")
+	if vhost != "/" {
+		vhost = "/" + vhost
+	}
 	uri = fmt.Sprintf("amqp://%s:%s@%s:%d%s",
 		cfg.GetString("rabbitmq.username"),
 		cfg.GetString("rabbitmq.password"),
 		cfg.GetString("rabbitmq.host"),
 		cfg.GetInt("rabbitmq.port"),
-		cfg.GetString("rabbitmq.vhost"))
+		vhost)
 	messageDataFilePath = cfg.GetString("consume.DataFile")
 	messages, err = loadMessagesFromFile(messageDataFilePath)
 	if err != nil {
-		ctx.Fatalf("load message data form file fail [%s],%s", messageDataFilePath, err)
+		ctx.Safe().Fatalf("load message data form file fail [%s],%s", messageDataFilePath, err)
 	}
 	if err = initPool(); err != nil {
-		ctx.Fatalf("init connection to rabbitmq fail : %s", err)
+		ctx.Safe().Fatalf("init connection to rabbitmq fail : %s", err)
 
 	}
 	if err = initChannelPool(); err != nil {
-		ctx.Fatalf("init Channel Pool fail : %s", err)
+		ctx.Safe().Fatalf("init Channel Pool fail : %s", err)
 	}
 
 }

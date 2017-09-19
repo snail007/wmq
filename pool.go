@@ -30,10 +30,8 @@ func newNetPool(poolConfig poolConfig) (pool ConnPool, err error) {
 		c, err := poolConfig.Factory()
 		if err != nil {
 			err = fmt.Errorf("factory is not able to fill the pool: %s", err)
-			if pool != nil {
-				pool.ReleaseAll()
-			}
-			break
+			p.ReleaseAll()
+			return nil, err
 		}
 		p.conns <- c
 	}

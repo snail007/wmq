@@ -225,7 +225,7 @@ func initPool() (err error) {
 				ctx.Debugf("Connect to RabbitMQ SUCCESS")
 				return
 			}
-			ctx.Debugf("Connect to RabbitMQ FAIL,ERR:%s", err)
+			ctx.Debugf("Connect to RabbitMQ FAIL,ERR:%s , URI:%s", err, uri)
 			return
 		},
 		IsActive: func(conn interface{}) (ok bool) {

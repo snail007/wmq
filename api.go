@@ -519,7 +519,7 @@ func serveAPI(listen, token string) (err error) {
 		router.Handler(ctx)
 	}
 	if fasthttp.ListenAndServe(listen, h) == nil {
-		ctx.Fatalf("start api fail:%s", err)
+		ctx.Safe().Fatalf("start api fail:%s", err)
 	}
 	return
 }
@@ -534,7 +534,7 @@ func servePublish(listen string) (err error) {
 		router.Handler(ctx)
 	}
 	if fasthttp.ListenAndServe(listen, h) == nil {
-		ctx.Fatalf("start publish fail:%s", err)
+		ctx.Safe().Fatalf("start publish fail:%s", err)
 	}
 	return
 }
