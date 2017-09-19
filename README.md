@@ -1,6 +1,6 @@
 # WMQ
 Wrapped  message queue which based on rabbitmq,support http protocol  
-![struct](/docs/images/struct.png)  
+[![struct](/docs/images/struct.png)](https://github.com/snail007/wmq)  
 # Requirement
 Linux are recommended,on windows the api "12.get or search last 100 lines log content" cannot be worked.
 # Notes
