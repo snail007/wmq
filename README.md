@@ -1,6 +1,8 @@
 # WMQ
-Wrapped  message queue which based on rabbitmq,support http protocol  
-[![struct](/docs/images/struct.png)](https://github.com/snail007/wmq)  
+<hr>
+[![stable](https://img.shields.io/badge/stable-stable-green.svg)](https://github.com/snail007/wmq/) [![license](https://img.shields.io/github/license/snail007/wmq.svg?style=plastic)]() [![download_count](https://img.shields.io/github/downloads/snail007/wmq/total.svg?style=plastic)](https://github.com/snail007/wmq/releases) [![download](https://img.shields.io/github/release/snail007/wmq.svg?style=plastic)](https://github.com/snail007/wmq/releases)  
+Wrapped  message queue which based on rabbitmq,support http protocol   
+[![struct](/docs/images/struct.png)](https://github.com/snail007/wmq)   
 # Requirement
 Linux are recommended,on windows the api "12.get or search last 100 lines log content" cannot be worked.
 # Notes
