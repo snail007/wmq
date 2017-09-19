@@ -1,5 +1,5 @@
 #!/bin/bash
-VER="2.2"
+VER="1.5"
 RELEASE="wmq_linux_amd64-${VER}"
 rm -rf ${RELEASE}
 mkdir ${RELEASE}
